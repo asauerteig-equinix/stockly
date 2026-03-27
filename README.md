@@ -38,7 +38,7 @@ README.md
 
 ## Portainer / Docker Stack
 
-Der Stack in [docker-compose.yml](stockly/docker-compose.yml) ist jetzt auf Portainer-Betrieb ausgelegt:
+Der Stack in `docker-compose.yml` ist jetzt auf Portainer-Betrieb ausgelegt:
 
 - Web-App extern auf Port `5600`
 - PostgreSQL extern auf Port `5416`
@@ -55,6 +55,13 @@ Der Stack in [docker-compose.yml](stockly/docker-compose.yml) ist jetzt auf Port
 4. Stack deployen.
 
 Danach ist die Anwendung unter `http://<server>:5600` erreichbar.
+
+### Wichtig fuer die Datenbank-Verbindung in Portainer
+
+- Innerhalb des Stacks spricht die App immer mit PostgreSQL ueber `db:5432`.
+- Der externe Host-Port `5416` ist nur fuer Zugriffe von ausserhalb des Stacks gedacht.
+- In Portainer solltest du deshalb **keine eigene `DATABASE_URL` mit `db:5416` oder `localhost:5416` setzen**.
+- Die Compose-Datei erzeugt die korrekte interne `DATABASE_URL` jetzt automatisch aus `POSTGRES_USER`, `POSTGRES_PASSWORD` und `POSTGRES_DB`.
 
 ### Wichtiger Hinweis zum ersten Start
 

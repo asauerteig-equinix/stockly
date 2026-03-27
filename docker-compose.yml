@@ -23,7 +23,7 @@ services:
       target: production
     restart: unless-stopped
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/stockly?schema=public}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-stockly}?schema=public
       APP_URL: ${APP_URL:-http://localhost:5600}
       SESSION_SECRET: ${SESSION_SECRET:-change-this-session-secret-in-portainer}
       KIOSK_SECRET: ${KIOSK_SECRET:-change-this-kiosk-secret-in-portainer}

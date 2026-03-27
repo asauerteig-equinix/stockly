@@ -5,11 +5,41 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 const autoSeed = (process.env.AUTO_SEED ?? "true").toLowerCase() === "true";
+const retryAttempts = 20;
+const retryDelayMs = 3000;
 
 function run(command) {
   execSync(command, {
     stdio: "inherit"
   });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function runWithRetry(command) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= retryAttempts; attempt += 1) {
+    try {
+      console.log(`Starte: ${command} (Versuch ${attempt}/${retryAttempts})`);
+      run(command);
+      return;
+    } catch (error) {
+      lastError = error;
+      console.error(`Befehl fehlgeschlagen: ${command}`);
+
+      if (attempt < retryAttempts) {
+        console.log(`Warte ${retryDelayMs / 1000} Sekunden und versuche erneut...`);
+        await sleep(retryDelayMs);
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 async function maybeSeed() {
@@ -30,7 +60,7 @@ async function maybeSeed() {
 }
 
 async function main() {
-  run("npx prisma migrate deploy");
+  await runWithRetry("npx prisma migrate deploy");
   await maybeSeed();
   await prisma.$disconnect();
 
