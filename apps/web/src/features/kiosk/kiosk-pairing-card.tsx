@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,40 +35,48 @@ export function KioskPairingCard({ locations }: KioskPairingCardProps) {
 
   return (
     <Card className="border-white/10 bg-slate-950/80 text-white">
-      <CardHeader>
+      <CardHeader className="gap-4">
+        <div className="flex items-center gap-2">
+          <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">PIN</Badge>
+          <Badge variant="muted" className="bg-white/10 text-slate-200">
+            Erster Start
+          </Badge>
+        </div>
         <CardTitle>Kiosk koppeln</CardTitle>
         <CardDescription className="text-slate-400">
-          Standort auswaehlen, PIN eingeben und das Geraet dauerhaft an dieses Lager binden.
+          Standort waehlen, PIN eingeben, fertig.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         <FormFeedback message={feedback.message} tone={feedback.tone} />
 
-        <div className="space-y-2">
-          <Label htmlFor="locationId" className="text-slate-100">
-            Standort
-          </Label>
-          <Select id="locationId" value={locationId} onChange={(event) => setLocationId(event.target.value)}>
-            {locations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.name} ({location.code})
-              </option>
-            ))}
-          </Select>
-        </div>
+        <div className="grid gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="locationId" className="text-slate-100">
+              Standort
+            </Label>
+            <Select id="locationId" value={locationId} onChange={(event) => setLocationId(event.target.value)}>
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name} ({location.code})
+                </option>
+              ))}
+            </Select>
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="kioskLabel" className="text-slate-100">
-            Geraetebezeichnung
-          </Label>
-          <Input id="kioskLabel" value={label} onChange={(event) => setLabel(event.target.value)} />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="pin" className="text-slate-100">
+              PIN
+            </Label>
+            <Input id="pin" type="password" value={pin} onChange={(event) => setPin(event.target.value)} />
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="pin" className="text-slate-100">
-            PIN
-          </Label>
-          <Input id="pin" type="password" value={pin} onChange={(event) => setPin(event.target.value)} />
+          <div className="space-y-2">
+            <Label htmlFor="kioskLabel" className="text-slate-100">
+              Terminalname
+            </Label>
+            <Input id="kioskLabel" value={label} onChange={(event) => setLabel(event.target.value)} />
+          </div>
         </div>
 
         <Button

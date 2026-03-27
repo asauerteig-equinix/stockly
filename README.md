@@ -111,6 +111,13 @@ npm run dev
 3. Es wird ein langlebiger, HTTP-only Kiosk-Cookie gesetzt und ein `KioskDevice` in der Datenbank angelegt.
 4. Reset ist nur ueber den geschuetzten Flow mit erneuter PIN-Bestaetigung moeglich.
 
+### Hinweis zum Kamera-Scan
+
+- Der Browser erlaubt Kamera-Zugriff in der Regel nur ueber `https://` oder auf `localhost`.
+- Eine normale LAN-URL ueber `http://<server>:5600` zeigt oft **kein** Kamera-Popup und blockiert den Zugriff direkt.
+- Fuer echten Barcode-Scan im Kiosk sollte die Anwendung deshalb ueber HTTPS hinter einem Reverse Proxy betrieben werden.
+- Die manuelle Barcode-Eingabe bleibt als Fallback weiterhin nutzbar.
+
 ## Migrationen und Datenbankfluss
 
 - Das Prisma-Schema liegt unter `apps/web/prisma/schema.prisma`.

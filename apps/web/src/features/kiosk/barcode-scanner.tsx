@@ -15,6 +15,34 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
   const [active, setActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function explainScannerError(scannerError?: unknown) {
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      return "Kamera-Scan braucht HTTPS oder localhost. Ueber normales HTTP blockiert der Browser den Kamerazugriff komplett.";
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      return "Dieser Browser stellt keinen Kamera-Zugriff bereit. Bitte HTTPS verwenden oder den Barcode manuell eingeben.";
+    }
+
+    if (scannerError && typeof scannerError === "object" && "name" in scannerError) {
+      const errorName = String(scannerError.name);
+
+      if (errorName === "NotAllowedError" || errorName === "SecurityError") {
+        return "Kamera-Zugriff wurde blockiert. Bitte Browserberechtigung und HTTPS-Kontext pruefen.";
+      }
+
+      if (errorName === "NotFoundError") {
+        return "Es wurde keine Kamera gefunden. Bitte Barcode manuell eingeben.";
+      }
+
+      if (errorName === "NotReadableError") {
+        return "Die Kamera ist bereits in Benutzung oder konnte nicht geoeffnet werden.";
+      }
+    }
+
+    return "Scanner konnte nicht gestartet werden. Bitte pruefen Sie Kameraberechtigung und HTTPS-Kontext.";
+  }
+
   useEffect(() => {
     if (!active || !videoRef.current) {
       return;
@@ -27,6 +55,11 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
 
     async function startScanner() {
       try {
+        if (typeof window !== "undefined" && !window.isSecureContext) {
+          setError(explainScannerError());
+          return;
+        }
+
         const devices = await BrowserMultiFormatReader.listVideoInputDevices();
         const selectedDevice = devices[0]?.deviceId;
 
@@ -41,8 +74,8 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
             setActive(false);
           }
         });
-      } catch {
-        setError("Scanner konnte nicht gestartet werden. Bitte pruefen Sie die Kameraberechtigung.");
+      } catch (scannerError) {
+        setError(explainScannerError(scannerError));
       }
     }
 
@@ -60,7 +93,7 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="font-medium text-white">Barcode-Scan</p>
-          <p className="text-sm text-slate-400">Onboard-Kamera fuer schnelle Lagerbuchungen.</p>
+          <p className="text-sm text-slate-400">Kamera starten oder Barcode oben eingeben.</p>
         </div>
         <Button variant={active ? "destructive" : "secondary"} onClick={() => setActive((value) => !value)}>
           {active ? "Scanner stoppen" : "Scanner starten"}

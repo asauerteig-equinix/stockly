@@ -1,5 +1,6 @@
-import { ScanLine, Smartphone, Warehouse } from "lucide-react";
+import { Camera, CheckCircle2, Keyboard, ScanLine, ShieldCheck } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KioskPairingCard } from "@/features/kiosk/kiosk-pairing-card";
 import { KioskTerminal } from "@/features/kiosk/kiosk-terminal";
@@ -48,47 +49,57 @@ export default async function KioskPage() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.16),_transparent_18%),radial-gradient(circle_at_top_right,_rgba(249,115,22,0.18),_transparent_18%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] text-white">
       <div className="page-shell space-y-8 py-8">
-        <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-          <section className="space-y-4">
-            <span className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-200">
-              Kiosk-Modus
-            </span>
-            <h1 className="max-w-3xl text-4xl font-semibold tracking-tight">Schnelle Lagerbuchungen direkt am Regal.</h1>
-            <p className="max-w-2xl text-lg text-slate-300">
-              Touchoptimierter Scanbereich, standortgebundene Buchungen und minimierte Klickwege fuer wiederholte Lagerprozesse.
-            </p>
-          </section>
+        <Card className="border-white/10 bg-white/5 text-white">
+          <CardContent className="flex flex-col gap-6 p-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">Kiosk</Badge>
+                {kiosk ? <Badge variant="success">Gekoppelt</Badge> : <Badge variant="warning">Nicht gekoppelt</Badge>}
+              </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            {[
-              {
-                icon: Warehouse,
-                title: "Standortbindung",
-                text: "Kiosk bucht nur fuer den gekoppelten Standort."
-              },
-              {
-                icon: ScanLine,
-                title: "Barcode-Scan",
-                text: "Kamera-Scan mit manueller Fallback-Eingabe."
-              },
-              {
-                icon: Smartphone,
-                title: "Touch-Flow",
-                text: "Grosse Buttons, klare Rueckmeldungen, wenig Schritte."
-              }
-            ].map(({ icon: Icon, title, text }) => (
-              <Card key={title} className="border-white/10 bg-white/5 text-white">
-                <CardHeader>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-200">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <CardTitle className="text-base">{title}</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm text-slate-300">{text}</CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
+              <div className="space-y-2">
+                <h1 className="text-4xl font-semibold tracking-tight">Schnelle Buchung im Lager.</h1>
+                <p className="max-w-2xl text-sm text-slate-300 sm:text-base">
+                  Scan oder Eingabe, Menge waehlen, buchen. Der Rest bleibt bewusst schlank.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
+                <div className="flex items-center gap-2 text-cyan-200">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em]">Status</span>
+                </div>
+                <p className="mt-2 text-sm font-medium text-white">{kiosk ? "Geraet verbunden" : "Kopplung noetig"}</p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
+                <div className="flex items-center gap-2 text-cyan-200">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em]">Standort</span>
+                </div>
+                <p className="mt-2 text-sm font-medium text-white">{kiosk ? kiosk.locationName : "Per PIN waehlen"}</p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
+                <div className="flex items-center gap-2 text-cyan-200">
+                  <Camera className="h-4 w-4" />
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em]">Scan</span>
+                </div>
+                <p className="mt-2 text-sm font-medium text-white">Kamera wenn verfuegbar</p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
+                <div className="flex items-center gap-2 text-cyan-200">
+                  <Keyboard className="h-4 w-4" />
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em]">Fallback</span>
+                </div>
+                <p className="mt-2 text-sm font-medium text-white">Manuelle Eingabe</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {kiosk ? (
           <KioskTerminal

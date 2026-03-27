@@ -2,7 +2,9 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { RotateCcw } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormFeedback } from "@/components/ui/form-feedback";
@@ -127,11 +129,13 @@ export function KioskTerminal({ kiosk, usageReasons }: KioskTerminalProps) {
     <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
       <div className="space-y-6">
         <Card className="border-white/10 bg-slate-950/80 text-white">
-          <CardHeader>
+          <CardHeader className="gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">{kiosk.locationCode}</Badge>
+              <Badge variant="success">Verbunden</Badge>
+            </div>
             <CardTitle>{kiosk.locationName}</CardTitle>
-            <CardDescription className="text-slate-400">
-              Kiosk gekoppelt an Standort {kiosk.locationCode}. Buchungen sind nur fuer diesen Standort erlaubt.
-            </CardDescription>
+            <CardDescription className="text-slate-400">Scan oder Barcode eingeben.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <FormFeedback message={feedback.message} tone={feedback.tone} />
@@ -157,22 +161,20 @@ export function KioskTerminal({ kiosk, usageReasons }: KioskTerminalProps) {
           </CardContent>
         </Card>
 
-        <Card className="border-white/10 bg-slate-950/80 text-white">
-          <CardHeader>
-            <CardTitle>Geschuetzter Reset</CardTitle>
-            <CardDescription className="text-slate-400">
-              Fuer eine Neuverbindung muss der Standort-PIN erneut bestaetigt werden.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Card className="border-white/10 bg-slate-950/60 text-white">
+          <CardContent className="space-y-4 p-5">
+            <div className="flex items-center gap-2">
+              <RotateCcw className="h-4 w-4 text-slate-300" />
+              <p className="text-sm font-medium text-slate-100">Kiosk neu verbinden</p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="resetPin" className="text-slate-100">
-                Standort-PIN
+                PIN
               </Label>
               <Input id="resetPin" type="password" value={resetPin} onChange={(event) => setResetPin(event.target.value)} />
             </div>
             <Button variant="outline" className="w-full border-white/10 bg-transparent text-white hover:bg-white/5" onClick={resetKiosk}>
-              Kioskbindung aufheben
+              Reset
             </Button>
           </CardContent>
         </Card>
@@ -181,9 +183,7 @@ export function KioskTerminal({ kiosk, usageReasons }: KioskTerminalProps) {
       <Card className="border-white/10 bg-slate-950/80 text-white">
         <CardHeader>
           <CardTitle>Lagerbuchung</CardTitle>
-          <CardDescription className="text-slate-400">
-            Touchoptimierte Entnahme- und Rueckgabeerfassung mit dynamisch sortierten Entnahmegruenden.
-          </CardDescription>
+          <CardDescription className="text-slate-400">Entnehmen oder zurueckbuchen.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {article ? (
@@ -191,15 +191,15 @@ export function KioskTerminal({ kiosk, usageReasons }: KioskTerminalProps) {
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-200">Erfasster Artikel</p>
               <h2 className="mt-2 text-2xl font-semibold text-white">{article.name}</h2>
               <p className="text-slate-300">
-                Barcode {article.barcode} • Kategorie {article.category}
+                Barcode {article.barcode} | Kategorie {article.category}
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl bg-slate-900/70 p-4">
-                  <p className="text-sm text-slate-400">Aktueller Bestand</p>
+                  <p className="text-sm text-slate-400">Bestand</p>
                   <p className="mt-1 text-3xl font-semibold text-white">{formatQuantity(article.quantity)}</p>
                 </div>
                 <div className="rounded-2xl bg-slate-900/70 p-4">
-                  <p className="text-sm text-slate-400">Mindestbestand</p>
+                  <p className="text-sm text-slate-400">Minimum</p>
                   <p className="mt-1 text-3xl font-semibold text-white">{formatQuantity(article.minimumStock)}</p>
                 </div>
               </div>
@@ -233,10 +233,10 @@ export function KioskTerminal({ kiosk, usageReasons }: KioskTerminalProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="note" className="text-slate-100">
-              Notiz
-            </Label>
-            <Input id="note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional" />
+              <Label htmlFor="note" className="text-slate-100">
+                Notiz
+              </Label>
+              <Input id="note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional" />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">

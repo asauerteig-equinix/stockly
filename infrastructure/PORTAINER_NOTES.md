@@ -7,4 +7,5 @@
 - Beim Containerstart werden zuerst `prisma migrate deploy` und optional ein Seed bei leerer Datenbank ausgefuehrt.
 - Der Bootstrap versucht Datenbankmigrationen mehrfach erneut, falls PostgreSQL kurz nach dem Stack-Start noch nicht bereit ist.
 - Fuer internes HTTP sollte `COOKIE_SECURE=false` gesetzt bleiben, damit Browser die Session-Cookies nicht verwerfen.
+- Fuer den browserbasierten Kamera-Scan im Kiosk ist in der Praxis HTTPS oder `localhost` noetig. Reines LAN-HTTP blockiert den Kamerazugriff meist ohne Berechtigungsdialog.
 - Vor dem ersten Produktivstart sollten `SESSION_SECRET`, `KIOSK_SECRET` und PostgreSQL-Zugangsdaten ersetzt werden.

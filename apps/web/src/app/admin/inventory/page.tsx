@@ -20,7 +20,8 @@ export default async function InventoryPage() {
     prisma.article.findMany({
       where: articleWhere,
       include: {
-        location: true
+        location: true,
+        inventoryBalance: true
       },
       orderBy: {
         name: "asc"
@@ -55,10 +56,17 @@ export default async function InventoryPage() {
           id: article.id,
           name: article.name,
           locationId: article.locationId,
-          locationName: article.location.name
+          locationName: article.location.name,
+          quantity: article.inventoryBalance?.quantity ?? 0,
+          minimumStock: article.minimumStock,
+          lastMovementAt: article.inventoryBalance?.lastMovementAt
+            ? formatDateTime(article.inventoryBalance.lastMovementAt)
+            : null
         }))}
         balances={balances.map((balance) => ({
           id: balance.id,
+          articleId: balance.articleId,
+          locationId: balance.locationId,
           locationName: balance.location.name,
           articleName: balance.article.name,
           quantity: balance.quantity,
