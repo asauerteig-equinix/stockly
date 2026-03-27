@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 42 33% 97%;
+  --foreground: 216 44% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 216 44% 14%;
+  --primary: 200 100% 29%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 201 44% 93%;
+  --secondary-foreground: 216 44% 18%;
+  --muted: 45 25% 93%;
+  --muted-foreground: 217 16% 42%;
+  --accent: 30 89% 92%;
+  --accent-foreground: 24 80% 22%;
+  --destructive: 0 75% 52%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 210 18% 84%;
+  --input: 210 18% 84%;
+  --ring: 200 100% 29%;
+  --radius: 1rem;
+}
+
+* {
+  @apply border-border;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply min-h-screen bg-background text-foreground antialiased;
+  background-image:
+    radial-gradient(circle at top left, rgba(14, 165, 233, 0.08), transparent 28%),
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.1), transparent 24%),
+    linear-gradient(180deg, #fffef7 0%, #f8fafc 100%);
+}
+
+a {
+  @apply text-inherit no-underline;
+}
+
+.page-shell {
+  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+}
+
+.grid-overlay {
+  background-image: theme("backgroundImage.grid");
+  background-size: 36px 36px;
+}

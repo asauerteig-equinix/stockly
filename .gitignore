@@ -1,0 +1,5 @@
+.env
+apps/web/.env
+apps/web/.next
+apps/web/node_modules
+apps/web/coverage

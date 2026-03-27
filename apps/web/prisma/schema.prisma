@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  MASTER_ADMIN
+  ADMIN
+}
+
+enum MovementType {
+  TAKE
+  RETURN
+  GOODS_RECEIPT
+  CORRECTION
+}
+
+enum SourceType {
+  ADMIN
+  KIOSK
+}
+
+model User {
+  id                String          @id @default(cuid())
+  email             String          @unique
+  name              String
+  passwordHash      String
+  role              Role
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  sessions          AdminSession[]
+  assignedLocations UserLocation[]
+  createdMovements  StockMovement[] @relation("CreatedByUser")
+}
+
+model AdminSession {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Location {
+  id                String             @id @default(cuid())
+  name              String
+  code              String             @unique
+  description       String?
+  kioskPinHash      String
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  settings          LocationSettings?
+  articles          Article[]
+  inventoryBalances InventoryBalance[]
+  stockMovements    StockMovement[]
+  kioskDevices      KioskDevice[]
+  adminAssignments  UserLocation[]
+
+  @@index([isActive])
+}
+
+model UserLocation {
+  userId     String
+  locationId String
+  assignedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@id([userId, locationId])
+  @@index([locationId])
+}
+
+model LocationSettings {
+  id                 String   @id @default(cuid())
+  locationId         String   @unique
+  agingWarningDays   Int      @default(30)
+  allowNegativeStock Boolean  @default(false)
+  lowStockBuffer     Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  location           Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+}
+
+model Article {
+  id                 String            @id @default(cuid())
+  locationId         String
+  name               String
+  barcode            String
+  description        String?
+  manufacturerNumber String?
+  supplierNumber     String?
+  category           String
+  minimumStock       Int               @default(0)
+  isArchived         Boolean           @default(false)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  location           Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  inventoryBalance   InventoryBalance?
+  stockMovements     StockMovement[]
+
+  @@unique([locationId, barcode])
+  @@index([locationId, name])
+  @@index([locationId, category])
+  @@index([isArchived])
+}
+
+model InventoryBalance {
+  id             String    @id @default(cuid())
+  locationId     String
+  articleId      String    @unique
+  quantity       Int       @default(0)
+  lastMovementAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  location       Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  article        Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([locationId, quantity])
+}
+
+model StockMovement {
+  id              String       @id @default(cuid())
+  locationId      String
+  articleId       String
+  type            MovementType
+  sourceType      SourceType
+  quantity        Int
+  usageReason     String?
+  note            String?
+  createdByUserId String?
+  createdAt       DateTime     @default(now())
+  location        Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  article         Article      @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  createdByUser   User?        @relation("CreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([locationId, createdAt(sort: Desc)])
+  @@index([articleId, createdAt(sort: Desc)])
+  @@index([type, createdAt(sort: Desc)])
+}
+
+model KioskDevice {
+  id         String   @id @default(cuid())
+  locationId String
+  label      String
+  tokenHash  String   @unique
+  isActive   Boolean  @default(true)
+  pairedAt   DateTime @default(now())
+  lastSeenAt DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId, isActive])
+}
