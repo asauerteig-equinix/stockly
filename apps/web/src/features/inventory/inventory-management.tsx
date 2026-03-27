@@ -25,6 +25,7 @@ type CorrectionValues = z.infer<typeof correctionSchema>;
 type ArticleOption = {
   id: string;
   name: string;
+  category: string;
   locationId: string;
   locationName: string;
   quantity: number;
@@ -38,6 +39,7 @@ type BalanceEntry = {
   locationId: string;
   locationName: string;
   articleName: string;
+  category: string;
   quantity: number;
   minimumStock: number;
   lastMovementAt: string | null;
@@ -94,8 +96,10 @@ export function InventoryManagement({ articles, balances }: InventoryManagementP
   const router = useRouter();
   const [mode, setMode] = useState<InventoryMode>("receipt");
   const [search, setSearch] = useState("");
+  const [articleSearch, setArticleSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [stockFilter, setStockFilter] = useState<StockFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string | null }>({
     tone: "success",
     message: null
@@ -149,19 +153,45 @@ export function InventoryManagement({ articles, balances }: InventoryManagementP
     );
   }, [articles]);
 
+  const categoryOptions = useMemo(
+    () => Array.from(new Set(articles.map((article) => article.category.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [articles]
+  );
+
+  const filteredArticleOptions = useMemo(() => {
+    const currentArticleId = mode === "receipt" ? receiptArticleId : correctionArticleId;
+    const normalizedSearch = articleSearch.trim().toLowerCase();
+    const options = articles.filter((article) => {
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      const haystack = `${article.name} ${article.category} ${article.locationName}`.toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+    const currentArticle = articles.find((article) => article.id === currentArticleId);
+
+    if (currentArticle && !options.some((article) => article.id === currentArticle.id)) {
+      return [currentArticle, ...options];
+    }
+
+    return options;
+  }, [articleSearch, articles, correctionArticleId, mode, receiptArticleId]);
+
   const filteredBalances = useMemo(() => {
     return balances.filter((balance) => {
-      const haystack = `${balance.articleName} ${balance.locationName}`.toLowerCase();
+      const haystack = `${balance.articleName} ${balance.category} ${balance.locationName}`.toLowerCase();
       const matchesSearch = haystack.includes(search.toLowerCase());
       const matchesLocation = locationFilter === "all" || balance.locationId === locationFilter;
+      const matchesCategory = categoryFilter === "all" || balance.category === categoryFilter;
       const matchesStock =
         stockFilter === "all" ||
         (stockFilter === "attention" && isAttention(balance)) ||
         (stockFilter === "quiet" && !balance.lastMovementAt);
 
-      return matchesSearch && matchesLocation && matchesStock;
+      return matchesSearch && matchesLocation && matchesCategory && matchesStock;
     });
-  }, [balances, locationFilter, search, stockFilter]);
+  }, [balances, categoryFilter, locationFilter, search, stockFilter]);
 
   function syncLocation(formName: InventoryMode, articleId: string) {
     const article = articles.find((entry) => entry.id === articleId);
@@ -292,17 +322,38 @@ export function InventoryManagement({ articles, balances }: InventoryManagementP
 
             <form className="space-y-4" onSubmit={mode === "receipt" ? submitGoodsReceipt : submitCorrection}>
               <div className="space-y-2">
+                <Label htmlFor="inventoryArticleSearch">Artikel suchen</Label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    id="inventoryArticleSearch"
+                    className="pl-9"
+                    value={articleSearch}
+                    onChange={(event) => setArticleSearch(event.target.value)}
+                    placeholder="Name, Kategorie oder Standort eingeben"
+                  />
+                </div>
+                <p className="text-xs text-slate-500">
+                  {formatQuantity(filteredArticleOptions.length)} Artikel in der aktuellen Auswahl.
+                </p>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="inventoryArticle">Artikel</Label>
                 <Select
                   id="inventoryArticle"
                   value={mode === "receipt" ? receiptArticleId : correctionArticleId}
                   onChange={(event) => syncLocation(mode, event.target.value)}
                 >
-                  {articles.map((article) => (
-                    <option key={article.id} value={article.id}>
-                      {article.name} ({article.locationName})
-                    </option>
-                  ))}
+                  {filteredArticleOptions.length ? (
+                    filteredArticleOptions.map((article) => (
+                      <option key={article.id} value={article.id}>
+                        {article.name} ({article.locationName} | {article.category})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">Keine Artikel passend zur Suche</option>
+                  )}
                 </Select>
                 <FieldError
                   message={
@@ -318,7 +369,9 @@ export function InventoryManagement({ articles, balances }: InventoryManagementP
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Ausgewaehlter Artikel</p>
                     <h3 className="mt-1 text-lg font-semibold text-slate-950">{selectedArticle.name}</h3>
-                    <p className="text-sm text-slate-600">{selectedArticle.locationName}</p>
+                    <p className="text-sm text-slate-600">
+                      {selectedArticle.locationName} | {selectedArticle.category}
+                    </p>
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-3">
@@ -398,14 +451,14 @@ export function InventoryManagement({ articles, balances }: InventoryManagementP
               </CardDescription>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_180px]">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_180px_180px]">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
                   className="pl-9"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Suche nach Artikel oder Standort"
+                  placeholder="Suche nach Artikel, Kategorie oder Standort"
                 />
               </div>
 
@@ -423,59 +476,81 @@ export function InventoryManagement({ articles, balances }: InventoryManagementP
                 <option value="attention">Unter Minimum</option>
                 <option value="quiet">Ohne Bewegung</option>
               </Select>
+
+              <Select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+                <option value="all">Alle Kategorien</option>
+                {categoryOptions.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </Select>
             </div>
           </CardHeader>
 
           <CardContent className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-secondary/60 px-4 py-3 text-sm text-slate-600">
+              <p>
+                <span className="font-semibold text-slate-950">{formatQuantity(filteredBalances.length)}</span> Positionen sichtbar
+              </p>
+              <p>
+                <span className="font-semibold text-slate-950">{formatQuantity(categoryOptions.length)}</span> Kategorien im Bestand
+              </p>
+            </div>
+
             {filteredBalances.length ? (
-              filteredBalances.map((balance) => {
-                const selected = selectedArticle?.id === balance.articleId;
-                const attention = isAttention(balance);
+              <div className="space-y-3 xl:max-h-[calc(100vh-24rem)] xl:overflow-y-auto xl:pr-1">
+                {filteredBalances.map((balance) => {
+                  const selected = selectedArticle?.id === balance.articleId;
+                  const attention = isAttention(balance);
 
-                return (
-                  <button
-                    key={balance.id}
-                    type="button"
-                    onClick={() => syncLocation(mode, balance.articleId)}
-                    className={cn(
-                      "w-full rounded-2xl border px-4 py-4 text-left transition",
-                      selected
-                        ? "border-primary bg-primary/5 shadow-sm"
-                        : "border-border bg-white/80 hover:border-primary/40 hover:bg-slate-50"
-                    )}
-                  >
-                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-base font-semibold text-slate-950">{balance.articleName}</p>
-                          {attention ? <Badge variant="warning">Unter Minimum</Badge> : <Badge variant="success">Im Rahmen</Badge>}
-                          {!balance.lastMovementAt ? <Badge variant="muted">Ohne Bewegung</Badge> : null}
-                        </div>
-                        <p className="text-sm text-slate-500">{balance.locationName}</p>
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-2xl bg-secondary/70 px-3 py-2">
-                          <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Bestand</p>
-                          <p className="mt-1 font-semibold text-slate-950">{formatQuantity(balance.quantity)}</p>
-                        </div>
-                        <div className="rounded-2xl bg-secondary/70 px-3 py-2">
-                          <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Minimum</p>
-                          <p className="mt-1 font-semibold text-slate-950">
-                            {formatQuantity(balance.minimumStock)}
+                  return (
+                    <button
+                      key={balance.id}
+                      type="button"
+                      onClick={() => syncLocation(mode, balance.articleId)}
+                      className={cn(
+                        "w-full rounded-2xl border px-4 py-4 text-left transition",
+                        selected
+                          ? "border-primary bg-primary/5 shadow-sm"
+                          : "border-border bg-white/80 hover:border-primary/40 hover:bg-slate-50"
+                      )}
+                    >
+                      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-base font-semibold text-slate-950">{balance.articleName}</p>
+                            {attention ? <Badge variant="warning">Unter Minimum</Badge> : <Badge variant="success">Im Rahmen</Badge>}
+                            {!balance.lastMovementAt ? <Badge variant="muted">Ohne Bewegung</Badge> : null}
+                          </div>
+                          <p className="text-sm text-slate-500">
+                            {balance.locationName} | {balance.category}
                           </p>
                         </div>
-                        <div className="rounded-2xl bg-secondary/70 px-3 py-2">
-                          <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Letzte Bewegung</p>
-                          <p className="mt-1 font-semibold text-slate-950">
-                            {balance.lastMovementAt ?? "Keine"}
-                          </p>
+
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <div className="rounded-2xl bg-secondary/70 px-3 py-2">
+                            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Bestand</p>
+                            <p className="mt-1 font-semibold text-slate-950">{formatQuantity(balance.quantity)}</p>
+                          </div>
+                          <div className="rounded-2xl bg-secondary/70 px-3 py-2">
+                            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Minimum</p>
+                            <p className="mt-1 font-semibold text-slate-950">
+                              {formatQuantity(balance.minimumStock)}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl bg-secondary/70 px-3 py-2">
+                            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Letzte Bewegung</p>
+                            <p className="mt-1 font-semibold text-slate-950">
+                              {balance.lastMovementAt ?? "Keine"}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </button>
-                );
-              })
+                    </button>
+                  );
+                })}
+              </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-border bg-slate-50/80 px-6 py-10 text-center">
                 <p className="text-base font-medium text-slate-900">Keine Bestandsposition passend zu den Filtern.</p>

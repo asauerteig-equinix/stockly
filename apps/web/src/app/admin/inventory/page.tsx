@@ -55,6 +55,7 @@ export default async function InventoryPage() {
         articles={articles.map((article) => ({
           id: article.id,
           name: article.name,
+          category: article.category,
           locationId: article.locationId,
           locationName: article.location.name,
           quantity: article.inventoryBalance?.quantity ?? 0,
@@ -69,6 +70,7 @@ export default async function InventoryPage() {
           locationId: balance.locationId,
           locationName: balance.location.name,
           articleName: balance.article.name,
+          category: balance.article.category,
           quantity: balance.quantity,
           minimumStock: balance.article.minimumStock,
           lastMovementAt: balance.lastMovementAt ? formatDateTime(balance.lastMovementAt) : null

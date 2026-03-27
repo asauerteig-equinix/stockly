@@ -107,6 +107,7 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string | null }>({
     tone: "success",
     message: null
@@ -143,20 +144,26 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
     form.reset(emptyValues(locationFilter !== "all" ? locationFilter : locations[0]?.id ?? ""));
   }, [form, locationFilter, locations, selectedArticle]);
 
+  const categories = useMemo(
+    () => Array.from(new Set(articles.map((article) => article.category.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [articles]
+  );
+
   const filteredArticles = useMemo(() => {
     return articles.filter((article) => {
       const haystack = `${article.name} ${article.barcode} ${article.category} ${article.locationName}`.toLowerCase();
       const matchesSearch = haystack.includes(search.toLowerCase());
       const matchesLocation = locationFilter === "all" || article.locationId === locationFilter;
+      const matchesCategory = categoryFilter === "all" || article.category === categoryFilter;
       const matchesStatus =
         statusFilter === "all" ||
         (statusFilter === "active" && !article.isArchived) ||
         (statusFilter === "archived" && article.isArchived) ||
         (statusFilter === "attention" && isLowStock(article));
 
-      return matchesSearch && matchesLocation && matchesStatus;
+      return matchesSearch && matchesLocation && matchesCategory && matchesStatus;
     });
-  }, [articles, locationFilter, search, statusFilter]);
+  }, [articles, categoryFilter, locationFilter, search, statusFilter]);
 
   const stats = useMemo(
     () => ({
@@ -274,7 +281,7 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
               </Button>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_180px]">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_180px_180px]">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
@@ -300,14 +307,32 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
                 <option value="attention">Aufmerksamkeit</option>
                 <option value="archived">Nur archiviert</option>
               </Select>
+
+              <Select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+                <option value="all">Alle Kategorien</option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </Select>
             </div>
           </CardHeader>
 
           <CardContent className="space-y-4">
             <FormFeedback message={feedback.message} tone={feedback.tone} />
 
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-secondary/60 px-4 py-3 text-sm text-slate-600">
+              <p>
+                <span className="font-semibold text-slate-950">{formatQuantity(filteredArticles.length)}</span> Artikel sichtbar
+              </p>
+              <p>
+                <span className="font-semibold text-slate-950">{formatQuantity(categories.length)}</span> Kategorien im Bestand
+              </p>
+            </div>
+
             {filteredArticles.length ? (
-              <div className="grid gap-3">
+              <div className="grid gap-3 xl:max-h-[calc(100vh-24rem)] xl:overflow-y-auto xl:pr-1">
                 {filteredArticles.map((article) => {
                   const attention = isLowStock(article);
                   const selected = selectedArticleId === article.id;
@@ -340,7 +365,7 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
                               {attention ? <Badge variant="warning">Unter Minimum</Badge> : null}
                             </div>
                             <p className="text-sm text-slate-500">
-                              {article.category} · Barcode {article.barcode}
+                              {article.category} | Barcode {article.barcode}
                             </p>
                           </div>
 
@@ -473,7 +498,12 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="category">Kategorie</Label>
-                    <Input id="category" placeholder="Optik, Kabel, Hardware ..." {...form.register("category")} />
+                    <Input
+                      id="category"
+                      list="article-category-options"
+                      placeholder="Optik, Kabel, Hardware ..."
+                      {...form.register("category")}
+                    />
                     <FieldError message={form.formState.errors.category?.message} />
                   </div>
                 </div>
@@ -544,6 +574,11 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
                   </Button>
                 ) : null}
               </div>
+              <datalist id="article-category-options">
+                {categories.map((category) => (
+                  <option key={category} value={category} />
+                ))}
+              </datalist>
             </form>
           </CardContent>
         </Card>
