@@ -38,7 +38,7 @@ README.md
 
 ## Portainer / Docker Stack
 
-Der Stack in [docker-compose.yml](C:/Users/Simaxe/GitHub%20Repos/stockly/docker-compose.yml) ist jetzt auf Portainer-Betrieb ausgelegt:
+Der Stack in [docker-compose.yml](stockly/docker-compose.yml) ist jetzt auf Portainer-Betrieb ausgelegt:
 
 - Web-App extern auf Port `5600`
 - PostgreSQL extern auf Port `5416`
