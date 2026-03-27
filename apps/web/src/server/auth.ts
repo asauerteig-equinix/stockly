@@ -53,7 +53,7 @@ export async function createAdminSession(userId: string) {
   const cookieStore = await cookies();
   cookieStore.set(ADMIN_SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: env.COOKIE_SECURE,
     sameSite: "lax",
     expires: expiresAt,
     path: "/"
@@ -74,7 +74,7 @@ export async function destroyAdminSession() {
 
   cookieStore.set(ADMIN_SESSION_COOKIE, "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: env.COOKIE_SECURE,
     sameSite: "lax",
     expires: new Date(0),
     path: "/"
@@ -151,7 +151,7 @@ export async function createKioskSession(locationId: string, label: string) {
   const cookieStore = await cookies();
   cookieStore.set(KIOSK_SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: env.COOKIE_SECURE,
     sameSite: "lax",
     expires: expiresAt,
     path: "/"
@@ -224,7 +224,7 @@ export async function clearKioskSession() {
 
   cookieStore.set(KIOSK_SESSION_COOKIE, "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: env.COOKIE_SECURE,
     sameSite: "lax",
     expires: new Date(0),
     path: "/"

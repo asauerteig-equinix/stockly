@@ -6,4 +6,5 @@
 - Innerhalb des Stacks nutzt die App trotzdem immer die interne Datenbank-Adresse `db:5432`.
 - Beim Containerstart werden zuerst `prisma migrate deploy` und optional ein Seed bei leerer Datenbank ausgefuehrt.
 - Der Bootstrap versucht Datenbankmigrationen mehrfach erneut, falls PostgreSQL kurz nach dem Stack-Start noch nicht bereit ist.
+- Fuer internes HTTP sollte `COOKIE_SECURE=false` gesetzt bleiben, damit Browser die Session-Cookies nicht verwerfen.
 - Vor dem ersten Produktivstart sollten `SESSION_SECRET`, `KIOSK_SECRET` und PostgreSQL-Zugangsdaten ersetzt werden.

@@ -62,6 +62,7 @@ Danach ist die Anwendung unter `http://<server>:5600` erreichbar.
 - Der externe Host-Port `5416` ist nur fuer Zugriffe von ausserhalb des Stacks gedacht.
 - In Portainer solltest du deshalb **keine eigene `DATABASE_URL` mit `db:5416` oder `localhost:5416` setzen**.
 - Die Compose-Datei erzeugt die korrekte interne `DATABASE_URL` jetzt automatisch aus `POSTGRES_USER`, `POSTGRES_PASSWORD` und `POSTGRES_DB`.
+- Fuer internes `http` muss `COOKIE_SECURE=false` bleiben, damit Browser die Login- und Kiosk-Cookies akzeptieren.
 
 ### Wichtiger Hinweis zum ersten Start
 
@@ -133,6 +134,7 @@ npx prisma generate
 - `APP_URL`: Basis-URL der Anwendung
 - `SESSION_SECRET`: Signierung der Admin-Sessions
 - `KIOSK_SECRET`: Signierung der Kiosk-Geraetebindungen
+- `COOKIE_SECURE`: nur fuer echte HTTPS-Deployments auf `true` setzen
 - `AUTO_SEED`: fuehrt Seed-Daten nur bei leerer Datenbank automatisch aus
 
 ## MVP-Funktionsumfang

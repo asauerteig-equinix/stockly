@@ -27,6 +27,7 @@ services:
       APP_URL: ${APP_URL:-http://localhost:5600}
       SESSION_SECRET: ${SESSION_SECRET:-change-this-session-secret-in-portainer}
       KIOSK_SECRET: ${KIOSK_SECRET:-change-this-kiosk-secret-in-portainer}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       AUTO_SEED: ${AUTO_SEED:-true}
       PORT: 3000
     depends_on:
