@@ -32,9 +32,8 @@ export default async function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       <PageIntro
-        eyebrow="Architekturkurzfassung"
         title="Dashboard"
-        description="Next.js App Router, Prisma/PostgreSQL, serverseitige Rollenpruefung und getrennte Admin- und Kiosk-Flaechen in einem wartbaren MVP."
+        description="Schnelle Uebersicht ueber Bestand, Warnungen, Verbrauch und die letzten Lagerbewegungen."
       />
 
       {statCards([

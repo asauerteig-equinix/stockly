@@ -14,6 +14,7 @@ import { FormFeedback } from "@/components/ui/form-feedback";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/cn";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatQuantity } from "@/server/format";
@@ -499,57 +500,49 @@ export function InventoryManagement({ articles, balances }: InventoryManagementP
             </div>
 
             {filteredBalances.length ? (
-              <div className="space-y-3 xl:max-h-[calc(100vh-24rem)] xl:overflow-y-auto xl:pr-1">
-                {filteredBalances.map((balance) => {
-                  const selected = selectedArticle?.id === balance.articleId;
-                  const attention = isAttention(balance);
+              <div className="overflow-hidden rounded-xl border border-border">
+                <div className="max-h-[32rem] overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Artikel</TableHead>
+                        <TableHead>Kategorie</TableHead>
+                        <TableHead>Standort</TableHead>
+                        <TableHead>Bestand</TableHead>
+                        <TableHead>Minimum</TableHead>
+                        <TableHead>Letzte Bewegung</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredBalances.map((balance) => {
+                        const selected = selectedArticle?.id === balance.articleId;
+                        const attention = isAttention(balance);
 
-                  return (
-                    <button
-                      key={balance.id}
-                      type="button"
-                      onClick={() => syncLocation(mode, balance.articleId)}
-                      className={cn(
-                        "w-full rounded-2xl border px-4 py-4 text-left transition",
-                        selected
-                          ? "border-primary bg-primary/5 shadow-sm"
-                          : "border-border bg-white/80 hover:border-primary/40 hover:bg-slate-50"
-                      )}
-                    >
-                      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-base font-semibold text-slate-950">{balance.articleName}</p>
-                            {attention ? <Badge variant="warning">Unter Minimum</Badge> : <Badge variant="success">Im Rahmen</Badge>}
-                            {!balance.lastMovementAt ? <Badge variant="muted">Ohne Bewegung</Badge> : null}
-                          </div>
-                          <p className="text-sm text-slate-500">
-                            {balance.locationName} | {balance.category}
-                          </p>
-                        </div>
-
-                        <div className="grid gap-3 sm:grid-cols-3">
-                          <div className="rounded-2xl bg-secondary/70 px-3 py-2">
-                            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Bestand</p>
-                            <p className="mt-1 font-semibold text-slate-950">{formatQuantity(balance.quantity)}</p>
-                          </div>
-                          <div className="rounded-2xl bg-secondary/70 px-3 py-2">
-                            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Minimum</p>
-                            <p className="mt-1 font-semibold text-slate-950">
-                              {formatQuantity(balance.minimumStock)}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl bg-secondary/70 px-3 py-2">
-                            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Letzte Bewegung</p>
-                            <p className="mt-1 font-semibold text-slate-950">
-                              {balance.lastMovementAt ?? "Keine"}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
+                        return (
+                          <TableRow
+                            key={balance.id}
+                            className={cn("cursor-pointer", selected ? "bg-primary/5" : "")}
+                            onClick={() => syncLocation(mode, balance.articleId)}
+                          >
+                            <TableCell className="font-medium text-slate-950">{balance.articleName}</TableCell>
+                            <TableCell>{balance.category}</TableCell>
+                            <TableCell>{balance.locationName}</TableCell>
+                            <TableCell className="font-medium">{formatQuantity(balance.quantity)}</TableCell>
+                            <TableCell>{formatQuantity(balance.minimumStock)}</TableCell>
+                            <TableCell>{balance.lastMovementAt ?? "Keine"}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-2">
+                                {attention ? <Badge variant="warning">Unter Minimum</Badge> : <Badge variant="success">Im Rahmen</Badge>}
+                                {!balance.lastMovementAt ? <Badge variant="muted">Ohne Bewegung</Badge> : null}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-border bg-slate-50/80 px-6 py-10 text-center">

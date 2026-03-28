@@ -26,7 +26,7 @@ export default async function LocationsPage() {
     <div className="space-y-8">
       <PageIntro
         title="Standortverwaltung"
-        description="Jeder Standort besitzt eigene PIN-, Bestands- und Warnregeln. Damit bleibt die Architektur von Beginn an mehrstandortfaehig."
+        description="Standorte, PINs und Lagerregeln zentral pflegen."
       />
 
       <LocationManagement

@@ -1,4 +1,4 @@
-import { Camera, CheckCircle2, Keyboard, ScanLine, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Hand, ShieldCheck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +37,45 @@ export default async function KioskPage() {
     ...usageReasonOptions.filter((reason) => !usageReasonOrder.some((entry) => entry.usageReason === reason))
   ];
 
+  const [kioskArticles, recentTakeMovements] = kiosk
+    ? await Promise.all([
+        prisma.article.findMany({
+          where: {
+            locationId: kiosk.locationId,
+            isArchived: false
+          },
+          include: {
+            inventoryBalance: true
+          },
+          orderBy: [{ category: "asc" }, { name: "asc" }]
+        }),
+        prisma.stockMovement.findMany({
+          where: {
+            locationId: kiosk.locationId,
+            type: "TAKE"
+          },
+          select: {
+            articleId: true
+          },
+          orderBy: {
+            createdAt: "desc"
+          },
+          take: 80
+        })
+      ])
+    : [[], []];
+
+  const popularArticleIds = kiosk
+    ? Array.from(
+        recentTakeMovements.reduce((articleCount, movement) => {
+          articleCount.set(movement.articleId, (articleCount.get(movement.articleId) ?? 0) + 1);
+          return articleCount;
+        }, new Map<string, number>())
+      )
+        .sort((left, right) => right[1] - left[1])
+        .map(([articleId]) => articleId)
+    : [];
+
   const locations = await prisma.location.findMany({
     where: {
       isActive: true
@@ -58,14 +97,15 @@ export default async function KioskPage() {
               </div>
 
               <div className="space-y-2">
-                <h1 className="text-4xl font-semibold tracking-tight">Schnelle Buchung im Lager.</h1>
+                <h1 className="text-4xl font-semibold tracking-tight">Touchscreen statt Tipparbeit.</h1>
                 <p className="max-w-2xl text-sm text-slate-300 sm:text-base">
-                  Scan oder Eingabe, Menge waehlen, buchen. Der Rest bleibt bewusst schlank.
+                  Artikel antippen, Menge waehlen, buchen. Der Kiosk ist jetzt fuer Touchbedienung aufgebaut und nicht
+                  mehr auf lange Eingaben angewiesen.
                 </p>
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
                 <div className="flex items-center gap-2 text-cyan-200">
                   <CheckCircle2 className="h-4 w-4" />
@@ -84,18 +124,10 @@ export default async function KioskPage() {
 
               <div className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
                 <div className="flex items-center gap-2 text-cyan-200">
-                  <Camera className="h-4 w-4" />
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em]">Scan</span>
+                  <Hand className="h-4 w-4" />
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em]">Bedienung</span>
                 </div>
-                <p className="mt-2 text-sm font-medium text-white">Kamera wenn verfuegbar</p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
-                <div className="flex items-center gap-2 text-cyan-200">
-                  <Keyboard className="h-4 w-4" />
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em]">Fallback</span>
-                </div>
-                <p className="mt-2 text-sm font-medium text-white">Manuelle Eingabe</p>
+                <p className="mt-2 text-sm font-medium text-white">{kiosk ? "Artikel per Touch auswaehlen" : "PIN per Tastenfeld"}</p>
               </div>
             </div>
           </CardContent>
@@ -108,6 +140,16 @@ export default async function KioskPage() {
               locationCode: kiosk.locationCode
             }}
             usageReasons={sortedUsageReasons}
+            articles={kioskArticles.map((article) => ({
+              id: article.id,
+              name: article.name,
+              barcode: article.barcode,
+              description: article.description,
+              category: article.category,
+              minimumStock: article.minimumStock,
+              quantity: article.inventoryBalance?.quantity ?? 0
+            }))}
+            popularArticleIds={popularArticleIds}
           />
         ) : (
           <div className="mx-auto max-w-xl">

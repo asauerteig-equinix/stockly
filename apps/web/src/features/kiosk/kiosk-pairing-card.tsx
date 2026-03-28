@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
+import { CheckCircle2, MapPin } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormFeedback } from "@/components/ui/form-feedback";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { fetchJson } from "@/lib/fetch-json";
+
+import { PinPad } from "./pin-pad";
 
 type LocationOption = {
   id: string;
@@ -26,15 +28,19 @@ export function KioskPairingCard({ locations }: KioskPairingCardProps) {
   const router = useRouter();
   const [locationId, setLocationId] = useState(locations[0]?.id ?? "");
   const [pin, setPin] = useState("");
-  const [label, setLabel] = useState("Lagerterminal");
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string | null }>({
     tone: "success",
     message: null
   });
   const [isPending, startTransition] = useTransition();
+  const selectedLocation = useMemo(
+    () => locations.find((location) => location.id === locationId) ?? null,
+    [locationId, locations]
+  );
+  const label = selectedLocation ? `Kiosk ${selectedLocation.code}` : "Lagerterminal";
 
   return (
-    <Card className="border-white/10 bg-slate-950/80 text-white">
+    <Card className="border-white/10 bg-slate-950/85 text-white">
       <CardHeader className="gap-4">
         <div className="flex items-center gap-2">
           <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">PIN</Badge>
@@ -44,14 +50,18 @@ export function KioskPairingCard({ locations }: KioskPairingCardProps) {
         </div>
         <CardTitle>Kiosk koppeln</CardTitle>
         <CardDescription className="text-slate-400">
-          Standort waehlen, PIN eingeben, fertig.
+          Standort waehlen, PIN antippen, fertig. Ein Terminalname wird automatisch vergeben.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         <FormFeedback message={feedback.message} tone={feedback.tone} />
 
-        <div className="grid gap-4">
-          <div className="space-y-2">
+        <div className="grid gap-5">
+          <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+            <div className="flex items-center gap-2 text-cyan-200">
+              <MapPin className="h-4 w-4" />
+              <span className="text-xs font-semibold uppercase tracking-[0.18em]">Standort</span>
+            </div>
             <Label htmlFor="locationId" className="text-slate-100">
               Standort
             </Label>
@@ -62,21 +72,23 @@ export function KioskPairingCard({ locations }: KioskPairingCardProps) {
                 </option>
               ))}
             </Select>
+
+            <div className="rounded-2xl bg-slate-950/80 px-4 py-3 text-sm text-slate-300">
+              <div className="flex items-center gap-2 text-emerald-200">
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="font-medium text-white">Terminalname</span>
+              </div>
+              <p className="mt-2">{label}</p>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="pin" className="text-slate-100">
-              PIN
-            </Label>
-            <Input id="pin" type="password" value={pin} onChange={(event) => setPin(event.target.value)} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="kioskLabel" className="text-slate-100">
-              Terminalname
-            </Label>
-            <Input id="kioskLabel" value={label} onChange={(event) => setLabel(event.target.value)} />
-          </div>
+          <PinPad
+            label="PIN"
+            value={pin}
+            onChange={setPin}
+            maxLength={20}
+            description="Die Standort-PIN direkt auf dem Touchscreen eingeben."
+          />
         </div>
 
         <Button

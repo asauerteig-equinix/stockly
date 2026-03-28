@@ -14,6 +14,7 @@ import { FormFeedback } from "@/components/ui/form-feedback";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { fetchJson } from "@/lib/fetch-json";
@@ -332,89 +333,85 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
             </div>
 
             {filteredArticles.length ? (
-              <div className="grid gap-3 xl:max-h-[calc(100vh-24rem)] xl:overflow-y-auto xl:pr-1">
-                {filteredArticles.map((article) => {
-                  const attention = isLowStock(article);
-                  const selected = selectedArticleId === article.id;
+              <div className="overflow-hidden rounded-xl border border-border">
+                <div className="max-h-[32rem] overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Artikel</TableHead>
+                        <TableHead>Kategorie</TableHead>
+                        <TableHead>Standort</TableHead>
+                        <TableHead>Bestand</TableHead>
+                        <TableHead>Minimum</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Aktion</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredArticles.map((article) => {
+                        const attention = isLowStock(article);
+                        const selected = selectedArticleId === article.id;
 
-                  return (
-                    <div
-                      key={article.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => editArticle(article)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          editArticle(article);
-                        }
-                      }}
-                      className={cn(
-                        "rounded-2xl border px-4 py-4 text-left transition",
-                        selected
-                          ? "border-primary bg-primary/5 shadow-sm"
-                          : "border-border bg-white/80 hover:border-primary/40 hover:bg-slate-50"
-                      )}
-                    >
-                      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                        <div className="space-y-3">
-                          <div className="space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-base font-semibold text-slate-950">{article.name}</p>
-                              {article.isArchived ? <Badge variant="muted">Archiviert</Badge> : <Badge variant="success">Aktiv</Badge>}
-                              {attention ? <Badge variant="warning">Unter Minimum</Badge> : null}
-                            </div>
-                            <p className="text-sm text-slate-500">
-                              {article.category} | Barcode {article.barcode}
-                            </p>
-                          </div>
-
-                          <div className="flex flex-wrap gap-3 text-sm text-slate-600">
-                            <span className="inline-flex items-center gap-2 rounded-full bg-secondary/70 px-3 py-1">
-                              <MapPin className="h-3.5 w-3.5" />
-                              {article.locationName}
-                            </span>
-                            <span className="rounded-full bg-slate-100 px-3 py-1">
-                              Bestand {formatQuantity(article.quantity)}
-                            </span>
-                            <span className="rounded-full bg-slate-100 px-3 py-1">
-                              Mindestbestand {formatQuantity(article.minimumStock)}
-                            </span>
-                          </div>
-
-                          {article.description ? (
-                            <p className="line-clamp-2 max-w-2xl text-sm text-slate-600">{article.description}</p>
-                          ) : (
-                            <p className="text-sm text-slate-400">Noch keine Beschreibung hinterlegt.</p>
-                          )}
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              editArticle(article);
-                            }}
+                        return (
+                          <TableRow
+                            key={article.id}
+                            className={cn("cursor-pointer", selected ? "bg-primary/5" : "")}
+                            onClick={() => editArticle(article)}
                           >
-                            Bearbeiten
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void toggleArchive(article);
-                            }}
-                          >
-                            {article.isArchived ? "Reaktivieren" : "Archivieren"}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                            <TableCell>
+                              <div className="space-y-1">
+                                <p className="font-medium text-slate-950">{article.name}</p>
+                                <p className="text-xs text-slate-500">Barcode {article.barcode}</p>
+                                {article.description ? (
+                                  <p className="line-clamp-1 text-xs text-slate-500">{article.description}</p>
+                                ) : null}
+                              </div>
+                            </TableCell>
+                            <TableCell>{article.category}</TableCell>
+                            <TableCell>
+                              <span className="inline-flex items-center gap-2 text-sm text-slate-700">
+                                <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                                {article.locationName}
+                              </span>
+                            </TableCell>
+                            <TableCell className="font-medium">{formatQuantity(article.quantity)}</TableCell>
+                            <TableCell>{formatQuantity(article.minimumStock)}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-2">
+                                {article.isArchived ? <Badge variant="muted">Archiviert</Badge> : <Badge variant="success">Aktiv</Badge>}
+                                {attention ? <Badge variant="warning">Unter Minimum</Badge> : null}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    editArticle(article);
+                                  }}
+                                >
+                                  Bearbeiten
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void toggleArchive(article);
+                                  }}
+                                >
+                                  {article.isArchived ? "Reaktivieren" : "Archivieren"}
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-border bg-slate-50/80 px-6 py-10 text-center">

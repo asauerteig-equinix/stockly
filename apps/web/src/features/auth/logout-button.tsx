@@ -13,7 +13,7 @@ export function LogoutButton() {
   return (
     <Button
       variant="outline"
-      className="w-full border-slate-800 bg-transparent text-slate-200 hover:bg-slate-900 hover:text-white"
+      className="w-full justify-start border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-950"
       disabled={isPending}
       onClick={() =>
         startTransition(async () => {

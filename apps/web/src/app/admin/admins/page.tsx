@@ -12,7 +12,7 @@ export default async function AdminsPage() {
       <div className="space-y-8">
         <PageIntro
           title="Adminverwaltung"
-          description="Die Verwaltung weiterer Admins ist im MVP bewusst auf den Master Admin begrenzt."
+          description="Nutzerkonten und globale Rollen koennen nur durch Master Admins verwaltet werden."
         />
         <Card>
           <CardContent className="p-6 text-sm text-slate-600">
@@ -48,7 +48,7 @@ export default async function AdminsPage() {
     <div className="space-y-8">
       <PageIntro
         title="Adminverwaltung"
-        description="Master Admins koennen weitere Nutzer anlegen und ihnen zugaengliche Standorte zuweisen."
+        description="Nutzer anlegen, Rollen setzen und Standortzugriffe steuern."
       />
 
       <AdminManagement
