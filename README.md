@@ -52,9 +52,10 @@ Der Stack in `docker-compose.yml` ist jetzt auf Portainer-Betrieb ausgelegt:
 1. Stack aus dem Git-Repository deployen, damit Portainer den Build-Kontext `apps/web` sauber verwenden kann.
 2. Die Variablen aus `.env.example` als Stack-Umgebungsvariablen in Portainer setzen.
 3. Vor allem `SESSION_SECRET`, `KIOSK_SECRET` und `POSTGRES_PASSWORD` produktiv ersetzen.
-4. Stack deployen.
+4. Wenn ein vorgeschalteter Reverse Proxy HTTPS terminiert, `APP_URL` auf die externe HTTPS-Adresse setzen und `COOKIE_SECURE=true` aktivieren.
+5. Stack deployen.
 
-Danach ist die Anwendung unter `http://<server>:5600` erreichbar.
+Danach ist die Anwendung intern unter `http://<server>:5600` erreichbar.
 
 ### Wichtig fuer die Datenbank-Verbindung in Portainer
 
@@ -62,7 +63,8 @@ Danach ist die Anwendung unter `http://<server>:5600` erreichbar.
 - Der externe Host-Port `5416` ist nur fuer Zugriffe von ausserhalb des Stacks gedacht.
 - In Portainer solltest du deshalb **keine eigene `DATABASE_URL` mit `db:5416` oder `localhost:5416` setzen**.
 - Die Compose-Datei erzeugt die korrekte interne `DATABASE_URL` jetzt automatisch aus `POSTGRES_USER`, `POSTGRES_PASSWORD` und `POSTGRES_DB`.
-- Fuer internes `http` muss `COOKIE_SECURE=false` bleiben, damit Browser die Login- und Kiosk-Cookies akzeptieren.
+- Fuer internen Direktzugriff ueber `http` muss `COOKIE_SECURE=false` bleiben, damit Browser die Login- und Kiosk-Cookies akzeptieren.
+- Hinter einem HTTPS-Reverse-Proxy sollte `APP_URL` auf die externe HTTPS-Adresse zeigen und `COOKIE_SECURE=true` gesetzt werden.
 
 ### Wichtiger Hinweis zum ersten Start
 
@@ -114,9 +116,11 @@ npm run dev
 ### Hinweis zum Kamera-Scan
 
 - Der Browser erlaubt Kamera-Zugriff in der Regel nur ueber `https://` oder auf `localhost`.
-- Eine normale LAN-URL ueber `http://<server>:5600` zeigt oft **kein** Kamera-Popup und blockiert den Zugriff direkt.
-- Fuer echten Barcode-Scan im Kiosk sollte die Anwendung deshalb ueber HTTPS hinter einem Reverse Proxy betrieben werden.
-- Die manuelle Barcode-Eingabe bleibt als Fallback weiterhin nutzbar.
+- Wenn ihr bereits einen vorgeschalteten Nginx-Proxy mit gueltigem HTTPS-Zertifikat nutzt, kann die Stockly-App intern weiter per `http://...:5600` laufen.
+- Entscheidend fuer den Scanner ist, dass der Browser die Seite ueber eine vertrauenswuerdige externe HTTPS-URL aufruft.
+- Fuer einen Proxy-Deploy sollte deshalb `APP_URL` die externe Adresse enthalten, z. B. `https://lager.example.local:5601`.
+- Dazu `COOKIE_SECURE=true` setzen und die Kiosk-Seite ueber genau diese HTTPS-Adresse oeffnen.
+- Ein Zertifikat mit Browser-Warnung reicht dafuer oft nicht sauber aus; die Verbindung muss fuer den Browser wirklich vertrauenswuerdig sein.
 
 ## Migrationen und Datenbankfluss
 
