@@ -5,6 +5,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 FROM deps AS builder
+ARG BASE_PATH=""
+ENV BASE_PATH=$BASE_PATH
 COPY . .
 RUN npx prisma generate
 RUN npm run build

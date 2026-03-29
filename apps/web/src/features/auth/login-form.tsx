@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -9,13 +8,13 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { withBasePath } from "@/lib/base-path";
 import { fetchJson } from "@/lib/fetch-json";
 import { loginSchema } from "@/server/validation";
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const form = useForm<LoginFormValues>({
@@ -35,8 +34,7 @@ export function LoginForm() {
           method: "POST",
           body: JSON.stringify(values)
         });
-        router.push("/admin");
-        router.refresh();
+        window.location.assign(withBasePath("/admin"));
       } catch (submitError) {
         setError(submitError instanceof Error ? submitError.message : "Login fehlgeschlagen.");
       }

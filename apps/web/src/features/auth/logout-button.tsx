@@ -1,13 +1,12 @@
 "use client";
 
 import { useTransition } from "react";
-import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { withBasePath } from "@/lib/base-path";
 import { fetchJson } from "@/lib/fetch-json";
 
 export function LogoutButton() {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   return (
@@ -18,8 +17,7 @@ export function LogoutButton() {
       onClick={() =>
         startTransition(async () => {
           await fetchJson("/api/auth/logout", { method: "POST" });
-          router.push("/login");
-          router.refresh();
+          window.location.assign(withBasePath("/login"));
         })
       }
     >

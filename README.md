@@ -53,6 +53,7 @@ Der Stack in `docker-compose.yml` ist jetzt auf Portainer-Betrieb ausgelegt:
 2. Die Variablen aus `.env.example` als Stack-Umgebungsvariablen in Portainer setzen.
 3. Vor allem `SESSION_SECRET`, `KIOSK_SECRET` und `POSTGRES_PASSWORD` produktiv ersetzen.
 4. Wenn ein vorgeschalteter Reverse Proxy HTTPS terminiert, `APP_URL` auf die externe HTTPS-Adresse setzen und `COOKIE_SECURE=true` aktivieren.
+5. Fuer einen Unterpfad-Deploy wie `/stockly` zusaetzlich `BASE_PATH=/stockly` setzen und den Stack danach neu bauen.
 5. Stack deployen.
 
 Danach ist die Anwendung intern unter `http://<server>:5600` erreichbar.
@@ -118,7 +119,8 @@ npm run dev
 - Der Browser erlaubt Kamera-Zugriff in der Regel nur ueber `https://` oder auf `localhost`.
 - Wenn ihr bereits einen vorgeschalteten Nginx-Proxy mit gueltigem HTTPS-Zertifikat nutzt, kann die Stockly-App intern weiter per `http://...:5600` laufen.
 - Entscheidend fuer den Scanner ist, dass der Browser die Seite ueber eine vertrauenswuerdige externe HTTPS-URL aufruft.
-- Fuer einen Proxy-Deploy sollte deshalb `APP_URL` die externe Adresse enthalten, z. B. `https://lager.example.local:5601`.
+- Fuer einen Proxy-Deploy sollte deshalb `APP_URL` die externe Adresse enthalten, z. B. `https://xxx.xxx.xxx/stockly`.
+- Wenn die App unter einem Unterpfad wie `/stockly` laeuft, muss ausserdem `BASE_PATH=/stockly` gesetzt und die App mit diesem Wert neu gebaut werden.
 - Dazu `COOKIE_SECURE=true` setzen und die Kiosk-Seite ueber genau diese HTTPS-Adresse oeffnen.
 - Ein Zertifikat mit Browser-Warnung reicht dafuer oft nicht sauber aus; die Verbindung muss fuer den Browser wirklich vertrauenswuerdig sein.
 
@@ -143,6 +145,7 @@ npx prisma generate
 
 - `DATABASE_URL`: PostgreSQL-Verbindung fuer Prisma
 - `APP_URL`: Basis-URL der Anwendung
+- `BASE_PATH`: optionaler Unterpfad fuer Deployments hinter einem Reverse Proxy, z. B. `/stockly`
 - `SESSION_SECRET`: Signierung der Admin-Sessions
 - `KIOSK_SECRET`: Signierung der Kiosk-Geraetebindungen
 - `COOKIE_SECURE`: nur fuer echte HTTPS-Deployments auf `true` setzen

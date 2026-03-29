@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { getCookiePath } from "@/lib/base-path";
 import {
   ADMIN_SESSION_COOKIE,
   ADMIN_SESSION_DURATION_DAYS,
@@ -13,6 +14,8 @@ import {
 } from "@/server/constants";
 import { prisma } from "@/server/db";
 import { env } from "@/server/env";
+
+const cookiePath = getCookiePath();
 
 export type AuthUser = Pick<User, "id" | "email" | "name" | "role"> & {
   assignedLocationIds: string[];
@@ -56,7 +59,7 @@ export async function createAdminSession(userId: string) {
     secure: env.COOKIE_SECURE,
     sameSite: "lax",
     expires: expiresAt,
-    path: "/"
+    path: cookiePath
   });
 }
 
@@ -77,7 +80,7 @@ export async function destroyAdminSession() {
     secure: env.COOKIE_SECURE,
     sameSite: "lax",
     expires: new Date(0),
-    path: "/"
+    path: cookiePath
   });
 }
 
@@ -154,7 +157,7 @@ export async function createKioskSession(locationId: string, label: string) {
     secure: env.COOKIE_SECURE,
     sameSite: "lax",
     expires: expiresAt,
-    path: "/"
+    path: cookiePath
   });
 
   return device;
@@ -227,6 +230,6 @@ export async function clearKioskSession() {
     secure: env.COOKIE_SECURE,
     sameSite: "lax",
     expires: new Date(0),
-    path: "/"
+    path: cookiePath
   });
 }

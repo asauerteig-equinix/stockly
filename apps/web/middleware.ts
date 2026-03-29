@@ -1,10 +1,11 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
+import { stripBasePath } from "@/lib/base-path";
 import { ADMIN_SESSION_COOKIE } from "@/server/constants";
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const pathname = stripBasePath(request.nextUrl.pathname);
   const hasAdminCookie = Boolean(request.cookies.get(ADMIN_SESSION_COOKIE)?.value);
 
   if (pathname.startsWith("/admin") && !hasAdminCookie) {
@@ -19,5 +20,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/login"]
+  matcher: ["/:path*"]
 };

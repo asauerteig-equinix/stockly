@@ -21,10 +21,13 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile
       target: production
+      args:
+        BASE_PATH: ${BASE_PATH:-}
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-stockly}?schema=public
       APP_URL: ${APP_URL:-http://localhost:5600}
+      BASE_PATH: ${BASE_PATH:-}
       SESSION_SECRET: ${SESSION_SECRET:-change-this-session-secret-in-portainer}
       KIOSK_SECRET: ${KIOSK_SECRET:-change-this-kiosk-secret-in-portainer}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
@@ -41,7 +44,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000/api/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+          "const basePath = (process.env.BASE_PATH ?? '').trim().replace(/^\\/+|\\/+$/g, ''); const prefix = basePath ? '/' + basePath : ''; fetch('http://127.0.0.1:3000' + prefix + '/api/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
         ]
       interval: 15s
       timeout: 5s
