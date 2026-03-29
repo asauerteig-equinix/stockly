@@ -41,6 +41,10 @@ function isAttention(article: ArticleResult) {
   return article.quantity <= article.minimumStock;
 }
 
+function normalizeBarcode(value: string) {
+  return value.trim().replace(/\s+/g, "");
+}
+
 export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds }: KioskTerminalProps) {
   const router = useRouter();
   const [catalogue, setCatalogue] = useState<ArticleResult[]>(articles);
@@ -91,17 +95,21 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
   }
 
   function selectByBarcode(detectedBarcode: string) {
-    const resolvedArticle = catalogue.find((article) => article.barcode === detectedBarcode);
+    const normalizedBarcode = normalizeBarcode(detectedBarcode);
+    const resolvedArticle = catalogue.find((article) => normalizeBarcode(article.barcode) === normalizedBarcode);
 
     if (!resolvedArticle) {
-      setFeedback({ tone: "error", message: "Kein passender Artikel fuer diesen Barcode gefunden." });
+      setFeedback({
+        tone: "error",
+        message: `Barcode ${normalizedBarcode} erkannt, aber keinem Artikel am Standort zugeordnet.`
+      });
       return;
     }
 
     setSelectedCategory(resolvedArticle.category);
     setSelectedArticleId(resolvedArticle.id);
     setQuantity(1);
-    setFeedback({ tone: "success", message: "Artikel per Barcode uebernommen." });
+    setFeedback({ tone: "success", message: `Barcode ${normalizedBarcode} erkannt. Artikel wurde uebernommen.` });
   }
 
   function updateArticleQuantity(articleId: string, nextQuantity: number) {
