@@ -55,20 +55,14 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
 
     async function startScanner() {
       try {
+        setError(null);
+
         if (typeof window !== "undefined" && !window.isSecureContext) {
           setError(explainScannerError());
           return;
         }
 
-        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-        const selectedDevice = devices[0]?.deviceId;
-
-        if (!selectedDevice) {
-          setError("Keine Kamera gefunden. Bitte Barcode manuell eingeben.");
-          return;
-        }
-
-        await reader.decodeFromVideoDevice(selectedDevice, videoElement, (result) => {
+        await reader.decodeFromVideoDevice(undefined, videoElement, (result) => {
           if (result && !stopped) {
             onDetected(result.getText());
             setActive(false);
