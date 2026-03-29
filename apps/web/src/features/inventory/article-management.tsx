@@ -131,7 +131,7 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
   );
 
   const form = useForm<ArticleFormValues>({
-    resolver: zodResolver(articleSchema),
+    resolver: zodResolver(articleFormSchema),
     defaultValues: emptyValues(locations[0]?.id ?? "")
   });
   const currentLocationId = form.watch("locationId");

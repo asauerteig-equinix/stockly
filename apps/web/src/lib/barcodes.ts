@@ -26,10 +26,18 @@ export function sanitizeAdditionalBarcodes(values: Iterable<string>, primaryBarc
   return dedupeBarcodes(values).filter((barcode) => barcode !== normalizedPrimaryBarcode);
 }
 
-export function parseBarcodeListInput(input: string) {
+export function parseBarcodeListInput(input?: string | null) {
+  if (!input) {
+    return [];
+  }
+
   return dedupeBarcodes(input.split(/[\r\n,;]+/));
 }
 
-export function formatBarcodeListInput(values: Iterable<string>) {
+export function formatBarcodeListInput(values?: Iterable<string> | null) {
+  if (!values) {
+    return "";
+  }
+
   return dedupeBarcodes(values).join("\n");
 }

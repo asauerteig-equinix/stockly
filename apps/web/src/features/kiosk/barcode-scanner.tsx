@@ -10,6 +10,11 @@ type BarcodeScannerProps = {
   onDetected: (barcode: string) => boolean | Promise<boolean>;
 };
 
+const SCAN_ZONE_WIDTH_RATIO = 0.74;
+const SCAN_ZONE_HEIGHT_RATIO = 0.34;
+const SCAN_INTERVAL_MS = 140;
+const DUPLICATE_WINDOW_MS = 1500;
+
 const scannerHints = new Map<DecodeHintType, unknown>([
   [DecodeHintType.TRY_HARDER, true],
   [
@@ -37,15 +42,30 @@ function normalizeDetectedBarcode(value: string) {
   return value.trim().replace(/\s+/g, "");
 }
 
+function isExpectedDecodeMiss(scanError: unknown) {
+  if (!scanError || typeof scanError !== "object" || !("name" in scanError)) {
+    return false;
+  }
+
+  const errorName = String(scanError.name);
+  return errorName === "NotFoundException" || errorName === "ChecksumException" || errorName === "FormatException";
+}
+
 export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const onDetectedRef = useRef(onDetected);
   const lastDetectedRef = useRef<{ barcode: string; timestamp: number }>({
     barcode: "",
     timestamp: 0
   });
   const [active, setActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onDetectedRef.current = onDetected;
+  }, [onDetected]);
 
   async function ensureAudioContext() {
     if (typeof window === "undefined" || !window.AudioContext) {
@@ -131,16 +151,118 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
   }
 
   useEffect(() => {
-    if (!active || !videoRef.current) {
+    if (!active || !videoRef.current || !canvasRef.current) {
       return;
     }
 
     let stopped = false;
-    const reader = new BrowserMultiFormatReader(scannerHints, {
-      delayBetweenScanAttempts: 120,
-      delayBetweenScanSuccess: 900
-    });
     const videoElement = videoRef.current;
+    const captureCanvas = canvasRef.current;
+    const reader = new BrowserMultiFormatReader(scannerHints);
+    let stream: MediaStream | null = null;
+    let scanTimeout: number | null = null;
+
+    function stopSession() {
+      if (scanTimeout) {
+        clearTimeout(scanTimeout);
+        scanTimeout = null;
+      }
+
+      const resettableReader = reader as BrowserMultiFormatReader & { reset?: () => void };
+      resettableReader.reset?.();
+
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+        stream = null;
+      }
+
+      videoElement.pause();
+      videoElement.srcObject = null;
+    }
+
+    function scheduleNextScan(delay = SCAN_INTERVAL_MS) {
+      if (stopped) {
+        return;
+      }
+
+      scanTimeout = window.setTimeout(() => {
+        void scanCurrentFrame();
+      }, delay);
+    }
+
+    async function handleDetectedBarcode(rawValue: string) {
+      const normalizedBarcode = normalizeDetectedBarcode(rawValue);
+
+      if (!normalizedBarcode) {
+        return;
+      }
+
+      const now = Date.now();
+      const isDuplicate =
+        lastDetectedRef.current.barcode === normalizedBarcode && now - lastDetectedRef.current.timestamp < DUPLICATE_WINDOW_MS;
+
+      if (isDuplicate) {
+        return;
+      }
+
+      lastDetectedRef.current = {
+        barcode: normalizedBarcode,
+        timestamp: now
+      };
+
+      try {
+        const wasMatched = await Promise.resolve(onDetectedRef.current(normalizedBarcode));
+        playFeedbackTone(wasMatched ? "success" : "error");
+        setError(null);
+      } catch {
+        playFeedbackTone("error");
+        setError("Erkannter Barcode konnte nicht verarbeitet werden.");
+      }
+    }
+
+    async function scanCurrentFrame() {
+      if (stopped) {
+        return;
+      }
+
+      if (videoElement.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !videoElement.videoWidth || !videoElement.videoHeight) {
+        scheduleNextScan();
+        return;
+      }
+
+      const sourceWidth = videoElement.videoWidth;
+      const sourceHeight = videoElement.videoHeight;
+      const zoneWidth = Math.min(sourceWidth, Math.max(320, Math.round(sourceWidth * SCAN_ZONE_WIDTH_RATIO)));
+      const zoneHeight = Math.min(sourceHeight, Math.max(180, Math.round(sourceHeight * SCAN_ZONE_HEIGHT_RATIO)));
+      const sourceX = Math.round((sourceWidth - zoneWidth) / 2);
+      const sourceY = Math.round((sourceHeight - zoneHeight) / 2);
+
+      captureCanvas.width = zoneWidth;
+      captureCanvas.height = zoneHeight;
+
+      const context = captureCanvas.getContext("2d", { willReadFrequently: true });
+
+      if (!context) {
+        setError("Scanbereich konnte nicht vorbereitet werden.");
+        return;
+      }
+
+      context.drawImage(videoElement, sourceX, sourceY, zoneWidth, zoneHeight, 0, 0, zoneWidth, zoneHeight);
+
+      try {
+        const result = reader.decodeFromCanvas(captureCanvas);
+
+        if (result) {
+          await handleDetectedBarcode(result.getText());
+        }
+      } catch (scanError) {
+        if (!isExpectedDecodeMiss(scanError) && !stopped) {
+          setError(explainScannerError(scanError));
+        }
+      } finally {
+        scheduleNextScan();
+      }
+    }
 
     async function startScanner() {
       try {
@@ -151,48 +273,26 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
           return;
         }
 
-        await reader.decodeFromConstraints(
-          {
-            video: {
-              facingMode: { ideal: "environment" },
-              width: { ideal: 1920 },
-              height: { ideal: 1080 }
-            },
-            audio: false
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
           },
-          videoElement,
-          (result) => {
-            if (!result || stopped) {
-              return;
-            }
+          audio: false
+        });
 
-            const normalizedBarcode = normalizeDetectedBarcode(result.getText());
+        if (stopped) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
 
-            if (!normalizedBarcode) {
-              return;
-            }
-
-            const now = Date.now();
-            const isDuplicate =
-              lastDetectedRef.current.barcode === normalizedBarcode && now - lastDetectedRef.current.timestamp < 1500;
-
-            if (isDuplicate) {
-              return;
-            }
-
-            lastDetectedRef.current = {
-              barcode: normalizedBarcode,
-              timestamp: now
-            };
-
-            void Promise.resolve(onDetected(normalizedBarcode)).then((wasMatched) => {
-              playFeedbackTone(wasMatched ? "success" : "error");
-              setError(null);
-            });
-          }
-        );
+        videoElement.srcObject = stream;
+        await videoElement.play();
+        scheduleNextScan(220);
       } catch (scannerError) {
         setError(explainScannerError(scannerError));
+        stopSession();
       }
     }
 
@@ -200,10 +300,9 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
 
     return () => {
       stopped = true;
-      const resettableReader = reader as BrowserMultiFormatReader & { reset?: () => void };
-      resettableReader.reset?.();
+      stopSession();
     };
-  }, [active, onDetected]);
+  }, [active]);
 
   return (
     <div className="space-y-3 rounded-3xl border border-white/10 bg-slate-950/70 p-4">
@@ -227,11 +326,39 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
         </Button>
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900">
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900">
         <video ref={videoRef} className="aspect-video w-full object-cover" muted playsInline />
+        <canvas ref={canvasRef} className="hidden" aria-hidden />
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-x-0 top-0 h-[28%] bg-slate-950/22" />
+          <div className="absolute inset-x-0 bottom-0 h-[28%] bg-slate-950/22" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div
+              className="relative min-h-28 rounded-[2rem] border border-cyan-300/45 bg-cyan-400/6 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
+              style={{
+                width: `${SCAN_ZONE_WIDTH_RATIO * 100}%`,
+                height: `${SCAN_ZONE_HEIGHT_RATIO * 100}%`
+              }}
+            >
+              <div className="absolute inset-x-5 top-1/2 h-5 -translate-y-1/2 rounded-full bg-cyan-300/12 blur-md" />
+              <div className="absolute inset-x-4 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-cyan-200 to-transparent" />
+              <div className="absolute left-4 top-4 h-6 w-6 rounded-tl-2xl border-l-2 border-t-2 border-cyan-200/80" />
+              <div className="absolute right-4 top-4 h-6 w-6 rounded-tr-2xl border-r-2 border-t-2 border-cyan-200/80" />
+              <div className="absolute bottom-4 left-4 h-6 w-6 rounded-bl-2xl border-b-2 border-l-2 border-cyan-200/80" />
+              <div className="absolute bottom-4 right-4 h-6 w-6 rounded-br-2xl border-b-2 border-r-2 border-cyan-200/80" />
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-slate-950/80 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-cyan-100">
+                Barcode hier ausrichten
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {active ? <p className="text-sm text-cyan-200">Scanner aktiv. Barcode mittig halten, Mehrfachtreffer werden kurz entprellt.</p> : null}
+      {active ? (
+        <p className="text-sm text-cyan-200">
+          Scanner aktiv. Gelesen wird vor allem der markierte Mittelbereich mit der Linie.
+        </p>
+      ) : null}
       {error ? <p className="rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">{error}</p> : null}
     </div>
   );
