@@ -7,7 +7,7 @@ import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { Button } from "@/components/ui/button";
 
 type BarcodeScannerProps = {
-  onDetected: (barcode: string) => void;
+  onDetected: (barcode: string) => boolean | Promise<boolean>;
 };
 
 const scannerHints = new Map<DecodeHintType, unknown>([
@@ -39,23 +39,20 @@ function normalizeDetectedBarcode(value: string) {
 
 export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const lastDetectedRef = useRef<{ barcode: string; timestamp: number }>({
+    barcode: "",
+    timestamp: 0
+  });
   const [active, setActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function ensureAudioContext() {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || !window.AudioContext) {
       return null;
     }
 
-    const AudioContextConstructor = window.AudioContext;
-
-    if (!AudioContextConstructor) {
-      return null;
-    }
-
-    const audioContext = audioContextRef.current ?? new AudioContextConstructor();
+    const audioContext = audioContextRef.current ?? new window.AudioContext();
     audioContextRef.current = audioContext;
 
     if (audioContext.state === "suspended") {
@@ -69,7 +66,7 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
     return audioContext;
   }
 
-  function playSuccessTone() {
+  function playFeedbackTone(type: "success" | "error") {
     const audioContext = audioContextRef.current;
 
     if (!audioContext || audioContext.state !== "running") {
@@ -80,19 +77,25 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
     const gainNode = audioContext.createGain();
     const startAt = audioContext.currentTime;
 
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(880, startAt);
-    oscillator.frequency.exponentialRampToValueAtTime(1320, startAt + 0.08);
+    oscillator.type = type === "success" ? "sine" : "triangle";
+
+    if (type === "success") {
+      oscillator.frequency.setValueAtTime(880, startAt);
+      oscillator.frequency.exponentialRampToValueAtTime(1320, startAt + 0.08);
+    } else {
+      oscillator.frequency.setValueAtTime(440, startAt);
+      oscillator.frequency.exponentialRampToValueAtTime(220, startAt + 0.14);
+    }
 
     gainNode.gain.setValueAtTime(0.0001, startAt);
-    gainNode.gain.exponentialRampToValueAtTime(0.12, startAt + 0.01);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.18);
+    gainNode.gain.exponentialRampToValueAtTime(type === "success" ? 0.12 : 0.08, startAt + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + (type === "success" ? 0.18 : 0.22));
 
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
 
     oscillator.start(startAt);
-    oscillator.stop(startAt + 0.18);
+    oscillator.stop(startAt + (type === "success" ? 0.18 : 0.22));
   }
 
   function explainScannerError(scannerError?: unknown) {
@@ -135,9 +138,8 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
     let stopped = false;
     const reader = new BrowserMultiFormatReader(scannerHints, {
       delayBetweenScanAttempts: 120,
-      delayBetweenScanSuccess: 1200
+      delayBetweenScanSuccess: 900
     });
-    readerRef.current = reader;
     const videoElement = videoRef.current;
 
     async function startScanner() {
@@ -159,16 +161,34 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
             audio: false
           },
           videoElement,
-          (result, _error, controls) => {
-            if (result && !stopped) {
-              playSuccessTone();
-              onDetected(normalizeDetectedBarcode(result.getText()));
-              controls.stop();
-              const resettableReader = reader as BrowserMultiFormatReader & { reset?: () => void };
-              resettableReader.reset?.();
-              setError(null);
-              setActive(false);
+          (result) => {
+            if (!result || stopped) {
+              return;
             }
+
+            const normalizedBarcode = normalizeDetectedBarcode(result.getText());
+
+            if (!normalizedBarcode) {
+              return;
+            }
+
+            const now = Date.now();
+            const isDuplicate =
+              lastDetectedRef.current.barcode === normalizedBarcode && now - lastDetectedRef.current.timestamp < 1500;
+
+            if (isDuplicate) {
+              return;
+            }
+
+            lastDetectedRef.current = {
+              barcode: normalizedBarcode,
+              timestamp: now
+            };
+
+            void Promise.resolve(onDetected(normalizedBarcode)).then((wasMatched) => {
+              playFeedbackTone(wasMatched ? "success" : "error");
+              setError(null);
+            });
           }
         );
       } catch (scannerError) {
@@ -189,14 +209,15 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
     <div className="space-y-3 rounded-3xl border border-white/10 bg-slate-950/70 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="font-medium text-white">Barcode-Scan</p>
-          <p className="text-sm text-slate-400">Barcode mittig vor die Kamera halten. Bei Treffer gibt es einen kurzen Signalton.</p>
+          <p className="font-medium text-white">Live-Scanner</p>
+          <p className="text-sm text-slate-400">Scanner bleibt aktiv. Hoher Ton bei Treffer, tiefer Ton bei unbekanntem Code.</p>
         </div>
         <Button
           variant={active ? "destructive" : "secondary"}
           onClick={async () => {
             if (!active) {
               await ensureAudioContext();
+              lastDetectedRef.current = { barcode: "", timestamp: 0 };
             }
 
             setActive((value) => !value);
@@ -210,7 +231,7 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
         <video ref={videoRef} className="aspect-video w-full object-cover" muted playsInline />
       </div>
 
-      {active ? <p className="text-sm text-cyan-200">Scanner aktiv. Gute Beleuchtung und etwas Abstand helfen der Erkennung.</p> : null}
+      {active ? <p className="text-sm text-cyan-200">Scanner aktiv. Barcode mittig halten, Mehrfachtreffer werden kurz entprellt.</p> : null}
       {error ? <p className="rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">{error}</p> : null}
     </div>
   );

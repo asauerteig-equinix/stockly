@@ -22,8 +22,8 @@ type AdminShellProps = {
 export function AdminShell({ user, children }: AdminShellProps) {
   return (
     <div className="min-h-screen bg-[#eef1f4] text-slate-900">
-      <div className="mx-auto grid min-h-screen max-w-[1680px] lg:grid-cols-[248px_minmax(0,1fr)]">
-        <aside className="border-b border-slate-200 bg-[#f7f8fa] px-5 py-6 lg:border-b-0 lg:border-r">
+      <div className="grid min-h-screen w-full lg:grid-cols-[272px_minmax(0,1fr)] xl:grid-cols-[296px_minmax(0,1fr)]">
+        <aside className="border-b border-slate-200 bg-[#f7f8fa] px-5 py-6 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r xl:px-6">
           <Link href="/admin" className="inline-flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 text-white">
               <Warehouse className="h-6 w-6" />
@@ -61,8 +61,8 @@ export function AdminShell({ user, children }: AdminShellProps) {
           </div>
         </aside>
 
-        <main className="bg-[#eef1f4] text-slate-900">
-          <div className="page-shell py-6 lg:py-8">{children}</div>
+        <main className="min-w-0 bg-[#eef1f4] text-slate-900">
+          <div className="w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8 xl:px-10 2xl:px-12">{children}</div>
         </main>
       </div>
     </div>

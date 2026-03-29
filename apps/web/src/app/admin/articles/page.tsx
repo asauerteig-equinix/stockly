@@ -32,7 +32,12 @@ export default async function ArticlesPage() {
             },
       include: {
         location: true,
-        inventoryBalance: true
+        inventoryBalance: true,
+        articleBarcodes: {
+          orderBy: {
+            barcode: "asc"
+          }
+        }
       },
       orderBy: [{ isArchived: "asc" }, { name: "asc" }]
     })
@@ -42,7 +47,7 @@ export default async function ArticlesPage() {
     <div className="space-y-8">
       <PageIntro
         title="Artikelverwaltung"
-        description="Artikel werden standortbezogen gepflegt, Barcodes pro Standort eindeutig gehalten und bevorzugt archiviert statt geloescht."
+        description="Artikel werden standortbezogen gepflegt. Ein Hauptbarcode bleibt Pflicht, weitere Hersteller-Barcodes koennen optional dem gleichen Artikel zugeordnet werden."
       />
 
       <ArticleManagement
@@ -56,6 +61,7 @@ export default async function ArticlesPage() {
           locationId: article.locationId,
           name: article.name,
           barcode: article.barcode,
+          additionalBarcodes: article.articleBarcodes.map((entry) => entry.barcode),
           description: article.description,
           manufacturerNumber: article.manufacturerNumber,
           supplierNumber: article.supplierNumber,

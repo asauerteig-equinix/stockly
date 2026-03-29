@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { normalizeBarcode, sanitizeAdditionalBarcodes } from "@/lib/barcodes";
 import { getCurrentUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { assertLocationAccess, apiError } from "@/server/permissions";
@@ -24,7 +25,12 @@ export async function GET() {
             },
       include: {
         inventoryBalance: true,
-        location: true
+        location: true,
+        articleBarcodes: {
+          orderBy: {
+            barcode: "asc"
+          }
+        }
       },
       orderBy: {
         name: "asc"
@@ -48,18 +54,46 @@ export async function POST(request: Request) {
     const body = articleSchema.parse(await request.json());
     assertLocationAccess(user, body.locationId);
 
-    const article = await prisma.article.create({
-      data: {
-        locationId: body.locationId,
-        name: body.name,
-        barcode: body.barcode,
-        description: body.description ?? null,
-        manufacturerNumber: body.manufacturerNumber ?? null,
-        supplierNumber: body.supplierNumber ?? null,
-        category: body.category,
-        minimumStock: body.minimumStock,
-        isArchived: body.isArchived
+    const primaryBarcode = normalizeBarcode(body.barcode);
+    const additionalBarcodes = sanitizeAdditionalBarcodes(body.additionalBarcodes ?? [], primaryBarcode);
+
+    const article = await prisma.$transaction(async (tx) => {
+      const createdArticle = await tx.article.create({
+        data: {
+          locationId: body.locationId,
+          name: body.name,
+          barcode: primaryBarcode,
+          description: body.description ?? null,
+          manufacturerNumber: body.manufacturerNumber ?? null,
+          supplierNumber: body.supplierNumber ?? null,
+          category: body.category,
+          minimumStock: body.minimumStock,
+          isArchived: body.isArchived
+        }
+      });
+
+      if (additionalBarcodes.length) {
+        await tx.articleBarcode.createMany({
+          data: additionalBarcodes.map((barcode) => ({
+            articleId: createdArticle.id,
+            locationId: body.locationId,
+            barcode
+          }))
+        });
       }
+
+      return tx.article.findUniqueOrThrow({
+        where: {
+          id: createdArticle.id
+        },
+        include: {
+          articleBarcodes: {
+            orderBy: {
+              barcode: "asc"
+            }
+          }
+        }
+      });
     });
 
     return NextResponse.json({ article });

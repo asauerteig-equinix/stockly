@@ -21,6 +21,7 @@ export const articleSchema = z.object({
   locationId: z.string().min(1),
   name: z.string().min(2),
   barcode: z.string().min(3),
+  additionalBarcodes: z.array(z.string().min(3)).optional().default([]),
   description: z.string().max(500).optional().nullable(),
   manufacturerNumber: z.string().max(120).optional().nullable(),
   supplierNumber: z.string().max(120).optional().nullable(),

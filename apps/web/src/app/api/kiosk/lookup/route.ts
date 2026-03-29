@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { normalizeBarcode } from "@/lib/barcodes";
 import { getKioskContext } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { apiError } from "@/server/permissions";
@@ -19,14 +20,32 @@ export async function GET(request: Request) {
       throw new Error("Barcode fehlt.");
     }
 
+    const normalizedBarcode = normalizeBarcode(barcode);
+
     const article = await prisma.article.findFirst({
       where: {
         locationId: kiosk.locationId,
-        barcode,
-        isArchived: false
+        isArchived: false,
+        OR: [
+          {
+            barcode: normalizedBarcode
+          },
+          {
+            articleBarcodes: {
+              some: {
+                barcode: normalizedBarcode
+              }
+            }
+          }
+        ],
       },
       include: {
-        inventoryBalance: true
+        inventoryBalance: true,
+        articleBarcodes: {
+          orderBy: {
+            barcode: "asc"
+          }
+        }
       }
     });
 
@@ -39,6 +58,7 @@ export async function GET(request: Request) {
         id: article.id,
         name: article.name,
         barcode: article.barcode,
+        additionalBarcodes: article.articleBarcodes.map((entry) => entry.barcode),
         description: article.description,
         category: article.category,
         minimumStock: article.minimumStock,

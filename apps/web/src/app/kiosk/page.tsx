@@ -1,7 +1,3 @@
-import { CheckCircle2, Hand, ShieldCheck } from "lucide-react";
-
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KioskPairingCard } from "@/features/kiosk/kiosk-pairing-card";
 import { KioskTerminal } from "@/features/kiosk/kiosk-terminal";
 import { getKioskContext } from "@/server/auth";
@@ -45,7 +41,12 @@ export default async function KioskPage() {
             isArchived: false
           },
           include: {
-            inventoryBalance: true
+            inventoryBalance: true,
+            articleBarcodes: {
+              orderBy: {
+                barcode: "asc"
+              }
+            }
           },
           orderBy: [{ category: "asc" }, { name: "asc" }]
         }),
@@ -86,54 +87,9 @@ export default async function KioskPage() {
   });
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.16),_transparent_18%),radial-gradient(circle_at_top_right,_rgba(249,115,22,0.18),_transparent_18%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] text-white">
-      <div className="page-shell space-y-8 py-8">
-        <Card className="border-white/10 bg-white/5 text-white">
-          <CardContent className="flex flex-col gap-6 p-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">Kiosk</Badge>
-                {kiosk ? <Badge variant="success">Gekoppelt</Badge> : <Badge variant="warning">Nicht gekoppelt</Badge>}
-              </div>
-
-              <div className="space-y-2">
-                <h1 className="text-4xl font-semibold tracking-tight">Touchscreen statt Tipparbeit.</h1>
-                <p className="max-w-2xl text-sm text-slate-300 sm:text-base">
-                  Artikel antippen, Menge waehlen, buchen. Der Kiosk ist jetzt fuer Touchbedienung aufgebaut und nicht
-                  mehr auf lange Eingaben angewiesen.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
-                <div className="flex items-center gap-2 text-cyan-200">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em]">Status</span>
-                </div>
-                <p className="mt-2 text-sm font-medium text-white">{kiosk ? "Geraet verbunden" : "Kopplung noetig"}</p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
-                <div className="flex items-center gap-2 text-cyan-200">
-                  <ShieldCheck className="h-4 w-4" />
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em]">Standort</span>
-                </div>
-                <p className="mt-2 text-sm font-medium text-white">{kiosk ? kiosk.locationName : "Per PIN waehlen"}</p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3">
-                <div className="flex items-center gap-2 text-cyan-200">
-                  <Hand className="h-4 w-4" />
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em]">Bedienung</span>
-                </div>
-                <p className="mt-2 text-sm font-medium text-white">{kiosk ? "Artikel per Touch auswaehlen" : "PIN per Tastenfeld"}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {kiosk ? (
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.16),_transparent_18%),radial-gradient(circle_at_bottom_right,_rgba(249,115,22,0.14),_transparent_22%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] text-white">
+      {kiosk ? (
+        <div className="page-shell py-4 lg:py-5">
           <KioskTerminal
             kiosk={{
               locationName: kiosk.locationName,
@@ -144,6 +100,7 @@ export default async function KioskPage() {
               id: article.id,
               name: article.name,
               barcode: article.barcode,
+              additionalBarcodes: article.articleBarcodes.map((entry) => entry.barcode),
               description: article.description,
               category: article.category,
               minimumStock: article.minimumStock,
@@ -151,8 +108,16 @@ export default async function KioskPage() {
             }))}
             popularArticleIds={popularArticleIds}
           />
-        ) : (
-          <div className="mx-auto max-w-xl">
+        </div>
+      ) : (
+        <div className="page-shell flex min-h-screen items-center justify-center py-8">
+          <div className="w-full max-w-xl space-y-4">
+            <div className="space-y-2 text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">Kiosk Setup</p>
+              <h1 className="text-3xl font-semibold tracking-tight text-white">Terminal koppeln</h1>
+              <p className="text-sm text-slate-400">Standort waehlen, PIN eingeben, danach startet direkt die Buchungsansicht.</p>
+            </div>
+
             <KioskPairingCard
               locations={locations.map((location) => ({
                 id: location.id,
@@ -161,8 +126,8 @@ export default async function KioskPage() {
               }))}
             />
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Archive, Boxes, MapPin, Plus, Search, TriangleAlert } from "lucide-react";
+import { Archive, Boxes, MapPin, Plus, Search, Sparkles, TriangleAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -16,12 +16,17 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { formatBarcodeListInput, parseBarcodeListInput } from "@/lib/barcodes";
 import { cn } from "@/lib/cn";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatQuantity } from "@/server/format";
 import { articleSchema } from "@/server/validation";
 
-type ArticleFormValues = z.infer<typeof articleSchema>;
+const articleFormSchema = articleSchema.omit({ additionalBarcodes: true }).extend({
+  additionalBarcodesInput: z.string().default("")
+});
+
+type ArticleFormValues = z.infer<typeof articleFormSchema>;
 
 type LocationOption = {
   id: string;
@@ -34,6 +39,7 @@ type ArticleEntry = {
   locationId: string;
   name: string;
   barcode: string;
+  additionalBarcodes: string[];
   description: string | null;
   manufacturerNumber: string | null;
   supplierNumber: string | null;
@@ -51,10 +57,13 @@ type ArticleManagementProps = {
 
 type StatusFilter = "all" | "active" | "archived" | "attention";
 
+const minimumStockPresets = [0, 1, 5, 10, 25] as const;
+
 const emptyValues = (locationId: string): ArticleFormValues => ({
   locationId,
   name: "",
   barcode: "",
+  additionalBarcodesInput: "",
   description: "",
   manufacturerNumber: "",
   supplierNumber: "",
@@ -104,6 +113,7 @@ function StatCard({
 
 export function ArticleManagement({ locations, articles }: ArticleManagementProps) {
   const router = useRouter();
+  const formCardRef = useRef<HTMLDivElement | null>(null);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -124,6 +134,7 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
     resolver: zodResolver(articleSchema),
     defaultValues: emptyValues(locations[0]?.id ?? "")
   });
+  const currentLocationId = form.watch("locationId");
 
   useEffect(() => {
     if (selectedArticle) {
@@ -132,6 +143,7 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
         locationId: selectedArticle.locationId,
         name: selectedArticle.name,
         barcode: selectedArticle.barcode,
+        additionalBarcodesInput: formatBarcodeListInput(selectedArticle.additionalBarcodes),
         description: selectedArticle.description ?? "",
         manufacturerNumber: selectedArticle.manufacturerNumber ?? "",
         supplierNumber: selectedArticle.supplierNumber ?? "",
@@ -152,7 +164,7 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
 
   const filteredArticles = useMemo(() => {
     return articles.filter((article) => {
-      const haystack = `${article.name} ${article.barcode} ${article.category} ${article.locationName}`.toLowerCase();
+      const haystack = `${article.name} ${article.barcode} ${article.additionalBarcodes.join(" ")} ${article.category} ${article.locationName}`.toLowerCase();
       const matchesSearch = haystack.includes(search.toLowerCase());
       const matchesLocation = locationFilter === "all" || article.locationId === locationFilter;
       const matchesCategory = categoryFilter === "all" || article.category === categoryFilter;
@@ -176,19 +188,29 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
     [articles]
   );
 
+  const selectedLocation = useMemo(
+    () => locations.find((location) => location.id === currentLocationId) ?? null,
+    [currentLocationId, locations]
+  );
+
   const onSubmit = form.handleSubmit((values) => {
     startTransition(async () => {
       try {
+        const payload = articleSchema.parse({
+          ...values,
+          additionalBarcodes: parseBarcodeListInput(values.additionalBarcodesInput)
+        });
+
         if (selectedArticle) {
           await fetchJson(`/api/articles/${selectedArticle.id}`, {
             method: "PATCH",
-            body: JSON.stringify(values)
+            body: JSON.stringify(payload)
           });
           setFeedback({ tone: "success", message: "Artikel erfolgreich aktualisiert." });
         } else {
           await fetchJson("/api/articles", {
             method: "POST",
-            body: JSON.stringify(values)
+            body: JSON.stringify(payload)
           });
           setFeedback({ tone: "success", message: "Artikel erfolgreich angelegt." });
         }
@@ -204,13 +226,19 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
     });
   });
 
+  function focusFormWorkspace() {
+    formCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function startNewArticle() {
     setSelectedArticleId(null);
     form.reset(emptyValues(locationFilter !== "all" ? locationFilter : locations[0]?.id ?? ""));
+    focusFormWorkspace();
   }
 
   function editArticle(article: ArticleEntry) {
     setSelectedArticleId(article.id);
+    focusFormWorkspace();
   }
 
   async function toggleArchive(article: ArticleEntry) {
@@ -238,7 +266,7 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
         <StatCard
           title="Artikel gesamt"
           value={formatQuantity(stats.total)}
@@ -265,294 +293,236 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card className="border-white/80 bg-white/90">
-          <CardHeader className="gap-4">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div ref={formCardRef}>
+        <Card className="border-white/80 bg-white/95 shadow-sm">
+          <CardHeader className="gap-5">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="space-y-2">
-                <CardTitle>Artikelbestand und Pflege</CardTitle>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="border border-primary/10 bg-primary/10 text-primary">
+                    {selectedArticle ? "Bearbeitungsmodus" : "Schnellerfassung"}
+                  </Badge>
+                  {selectedLocation ? (
+                    <Badge variant="muted">
+                      Standort {selectedLocation.name} ({selectedLocation.code})
+                    </Badge>
+                  ) : null}
+                </div>
+                <CardTitle>{selectedArticle ? `Artikel bearbeiten: ${selectedArticle.name}` : "Artikel schnell und sauber anlegen"}</CardTitle>
                 <CardDescription>
-                  Suche, Filter und Direktwahl in einer Arbeitsflaeche. Ein Klick auf einen Eintrag oeffnet sofort den
-                  passenden Editor.
+                  Die wichtigsten Felder stehen jetzt direkt im Fokus. Zusatzinfos bleiben sichtbar, aber nicht mehr im Weg.
                 </CardDescription>
               </div>
-              <Button className="shrink-0" onClick={startNewArticle}>
-                <Plus className="mr-2 h-4 w-4" />
-                Neuer Artikel
-              </Button>
-            </div>
-
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_180px_180px]">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
-                  className="pl-9"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Suche nach Name, Barcode, Kategorie oder Standort"
-                />
-              </div>
-
-              <Select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}>
-                <option value="all">Alle Standorte</option>
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name} ({location.code})
-                  </option>
-                ))}
-              </Select>
-
-              <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
-                <option value="all">Alle Stati</option>
-                <option value="active">Nur aktiv</option>
-                <option value="attention">Aufmerksamkeit</option>
-                <option value="archived">Nur archiviert</option>
-              </Select>
-
-              <Select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-                <option value="all">Alle Kategorien</option>
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </CardHeader>
-
-          <CardContent className="space-y-4">
-            <FormFeedback message={feedback.message} tone={feedback.tone} />
-
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-secondary/60 px-4 py-3 text-sm text-slate-600">
-              <p>
-                <span className="font-semibold text-slate-950">{formatQuantity(filteredArticles.length)}</span> Artikel sichtbar
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">{formatQuantity(categories.length)}</span> Kategorien im Bestand
-              </p>
-            </div>
-
-            {filteredArticles.length ? (
-              <div className="overflow-hidden rounded-xl border border-border">
-                <div className="max-h-[32rem] overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Artikel</TableHead>
-                        <TableHead>Kategorie</TableHead>
-                        <TableHead>Standort</TableHead>
-                        <TableHead>Bestand</TableHead>
-                        <TableHead>Minimum</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Aktion</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredArticles.map((article) => {
-                        const attention = isLowStock(article);
-                        const selected = selectedArticleId === article.id;
-
-                        return (
-                          <TableRow
-                            key={article.id}
-                            className={cn("cursor-pointer", selected ? "bg-primary/5" : "")}
-                            onClick={() => editArticle(article)}
-                          >
-                            <TableCell>
-                              <div className="space-y-1">
-                                <p className="font-medium text-slate-950">{article.name}</p>
-                                <p className="text-xs text-slate-500">Barcode {article.barcode}</p>
-                                {article.description ? (
-                                  <p className="line-clamp-1 text-xs text-slate-500">{article.description}</p>
-                                ) : null}
-                              </div>
-                            </TableCell>
-                            <TableCell>{article.category}</TableCell>
-                            <TableCell>
-                              <span className="inline-flex items-center gap-2 text-sm text-slate-700">
-                                <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                                {article.locationName}
-                              </span>
-                            </TableCell>
-                            <TableCell className="font-medium">{formatQuantity(article.quantity)}</TableCell>
-                            <TableCell>{formatQuantity(article.minimumStock)}</TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-2">
-                                {article.isArchived ? <Badge variant="muted">Archiviert</Badge> : <Badge variant="success">Aktiv</Badge>}
-                                {attention ? <Badge variant="warning">Unter Minimum</Badge> : null}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    editArticle(article);
-                                  }}
-                                >
-                                  Bearbeiten
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void toggleArchive(article);
-                                  }}
-                                >
-                                  {article.isArchived ? "Reaktivieren" : "Archivieren"}
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-border bg-slate-50/80 px-6 py-10 text-center">
-                <p className="text-base font-medium text-slate-900">Keine passenden Artikel gefunden.</p>
-                <p className="mt-2 text-sm text-slate-500">
-                  Passe Suche oder Filter an oder lege direkt einen neuen Artikel an.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/80 bg-white/95 xl:sticky xl:top-8">
-          <CardHeader className="gap-4">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <CardTitle>{selectedArticle ? "Artikel bearbeiten" : "Neuen Artikel anlegen"}</CardTitle>
-                  <CardDescription>
-                    Klare Felder fuer Identitaet, Lagerregeln und Zusatzinformationen statt eines unstrukturierten
-                    Formularblocks.
-                  </CardDescription>
-                </div>
-                {selectedArticle ? <Badge>Bearbeitung</Badge> : <Badge variant="muted">Neu</Badge>}
-              </div>
-
-              {selectedArticle ? (
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl bg-secondary/70 p-3">
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Bestand</p>
-                    <p className="mt-1 text-xl font-semibold text-slate-950">{formatQuantity(selectedArticle.quantity)}</p>
-                  </div>
-                  <div className="rounded-2xl bg-secondary/70 p-3">
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Minimum</p>
-                    <p className="mt-1 text-xl font-semibold text-slate-950">
-                      {formatQuantity(selectedArticle.minimumStock)}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-secondary/70 p-3">
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Status</p>
-                    <p className="mt-1 text-base font-semibold text-slate-950">
-                      {selectedArticle.isArchived ? "Archiviert" : "Aktiv"}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </CardHeader>
-
-          <CardContent>
-            <form className="space-y-5" onSubmit={onSubmit}>
-              <section className="space-y-4 rounded-2xl border border-border/70 bg-slate-50/80 p-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">Identitaet und Zuordnung</h3>
-                  <p className="text-sm text-slate-500">Name, Barcode und Standort bilden die operative Basis.</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="locationId">Standort</Label>
-                  <Select id="locationId" {...form.register("locationId")}>
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.name} ({location.code})
-                      </option>
-                    ))}
-                  </Select>
-                  <FieldError message={form.formState.errors.locationId?.message} />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="name">Kurzname</Label>
-                  <Input id="name" placeholder="z. B. SFP Modul 10G" {...form.register("name")} />
-                  <FieldError message={form.formState.errors.name?.message} />
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="barcode">Barcode</Label>
-                    <Input id="barcode" placeholder="Eindeutig pro Standort" {...form.register("barcode")} />
-                    <FieldError message={form.formState.errors.barcode?.message} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Kategorie</Label>
-                    <Input
-                      id="category"
-                      list="article-category-options"
-                      placeholder="Optik, Kabel, Hardware ..."
-                      {...form.register("category")}
-                    />
-                    <FieldError message={form.formState.errors.category?.message} />
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-4 rounded-2xl border border-border/70 bg-slate-50/80 p-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">Lagerregeln</h3>
-                  <p className="text-sm text-slate-500">Der Mindestbestand steuert Warnungen und operative Aufmerksamkeit.</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="minimumStock">Mindestbestand</Label>
-                  <Input id="minimumStock" type="number" min={0} {...form.register("minimumStock")} />
-                  <FieldError message={form.formState.errors.minimumStock?.message} />
-                </div>
-
-                {selectedArticle ? (
-                  <div className="rounded-2xl bg-white/90 px-4 py-3 text-sm text-slate-600">
-                    Status aktuell:{" "}
-                    <span className="font-medium text-slate-950">
-                      {selectedArticle.isArchived ? "Archiviert" : "Aktiv"}
-                    </span>
-                    . Den Archivstatus kannst du direkt im Listenbereich wechseln.
-                  </div>
-                ) : null}
-              </section>
-
-              <section className="space-y-4 rounded-2xl border border-border/70 bg-slate-50/80 p-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">Lieferant und Beschreibung</h3>
-                  <p className="text-sm text-slate-500">Zusatzinfos fuer schnellere Zuordnung im Alltag.</p>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="manufacturerNumber">Hersteller-Nr.</Label>
-                    <Input id="manufacturerNumber" {...form.register("manufacturerNumber")} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="supplierNumber">Lieferanten-Nr.</Label>
-                    <Input id="supplierNumber" {...form.register("supplierNumber")} />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Beschreibung</Label>
-                  <Textarea id="description" placeholder="Kurzbeschreibung fuer Lager und Admins" {...form.register("description")} />
-                </div>
-              </section>
 
               <div className="flex flex-wrap gap-3">
+                <Button onClick={startNewArticle}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Neuer Artikel
+                </Button>
+                {selectedArticle ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      void toggleArchive(selectedArticle);
+                    }}
+                  >
+                    {selectedArticle.isArchived ? "Artikel reaktivieren" : "Artikel archivieren"}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+            {selectedArticle ? (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="rounded-2xl bg-secondary/70 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Standort</p>
+                  <p className="mt-1 text-base font-semibold text-slate-950">{selectedArticle.locationName}</p>
+                </div>
+                <div className="rounded-2xl bg-secondary/70 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Bestand</p>
+                  <p className="mt-1 text-xl font-semibold text-slate-950">{formatQuantity(selectedArticle.quantity)}</p>
+                </div>
+                <div className="rounded-2xl bg-secondary/70 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Minimum</p>
+                  <p className="mt-1 text-xl font-semibold text-slate-950">{formatQuantity(selectedArticle.minimumStock)}</p>
+                </div>
+                <div className="rounded-2xl bg-secondary/70 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Status</p>
+                  <p className="mt-1 text-base font-semibold text-slate-950">
+                    {selectedArticle.isArchived ? "Archiviert" : isLowStock(selectedArticle) ? "Aufmerksamkeit" : "Aktiv"}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-secondary/70 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Zusatz-Barcodes</p>
+                  <p className="mt-1 text-base font-semibold text-slate-950">
+                    {formatQuantity(selectedArticle.additionalBarcodes.length)}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+          </CardHeader>
+
+          <CardContent className="space-y-5">
+            <FormFeedback message={feedback.message} tone={feedback.tone} />
+
+            <form className="space-y-5" onSubmit={onSubmit}>
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_380px]">
+                <section className="space-y-4 rounded-2xl border border-border/70 bg-slate-50/80 p-5">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-slate-900">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <h3 className="text-sm font-semibold">Stammdaten</h3>
+                    </div>
+                    <p className="text-sm text-slate-500">Name, Hauptbarcode, optionale Zusatz-Barcodes, Standort und Kategorie bilden die Basis fuer Suche, Scanner und Buchung.</p>
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <div className="space-y-2 xl:col-span-2">
+                      <Label htmlFor="name">Artikelname</Label>
+                      <Input id="name" placeholder="z. B. SFP Modul 10G Single-Mode" {...form.register("name")} />
+                      <FieldError message={form.formState.errors.name?.message} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="barcode">Hauptbarcode</Label>
+                      <Input id="barcode" placeholder="Standard-Barcode fuer diesen Artikel" {...form.register("barcode")} />
+                      <FieldError message={form.formState.errors.barcode?.message} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="locationId">Standort</Label>
+                      <Select id="locationId" {...form.register("locationId")}>
+                        {locations.map((location) => (
+                          <option key={location.id} value={location.id}>
+                            {location.name} ({location.code})
+                          </option>
+                        ))}
+                      </Select>
+                      <FieldError message={form.formState.errors.locationId?.message} />
+                    </div>
+
+                    <div className="space-y-2 xl:col-span-2">
+                      <Label htmlFor="additionalBarcodesInput">Weitere Barcodes</Label>
+                      <Textarea
+                        id="additionalBarcodesInput"
+                        className="min-h-[110px]"
+                        placeholder={"Optional, z. B. ein Barcode pro Zeile\n1234567890123\n998877665544"}
+                        {...form.register("additionalBarcodesInput")}
+                      />
+                      <p className="text-xs text-slate-500">
+                        Optional. Sinnvoll, wenn verschiedene Hersteller fuer denselben Artikel unterschiedliche Barcodes nutzen.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 xl:col-span-2">
+                      <Label htmlFor="category">Kategorie</Label>
+                      <Input
+                        id="category"
+                        list="article-category-options"
+                        placeholder="Optik, Kabel, Hardware ..."
+                        {...form.register("category")}
+                      />
+                      <FieldError message={form.formState.errors.category?.message} />
+                      {categories.length ? (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {categories.slice(0, 10).map((category) => (
+                            <Button
+                              key={category}
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 border-white bg-white text-slate-700 hover:bg-slate-100"
+                              onClick={() =>
+                                form.setValue("category", category, {
+                                  shouldDirty: true,
+                                  shouldValidate: true
+                                })
+                              }
+                            >
+                              {category}
+                            </Button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </section>
+
+                <section className="space-y-4 rounded-2xl border border-border/70 bg-slate-50/80 p-5">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-semibold text-slate-900">Lagerregeln</h3>
+                    <p className="text-sm text-slate-500">Hier steuerst du, ab wann der Artikel in Warnungen auftaucht.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="minimumStock">Mindestbestand</Label>
+                    <Input id="minimumStock" type="number" min={0} {...form.register("minimumStock")} />
+                    <FieldError message={form.formState.errors.minimumStock?.message} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Schnellwerte</p>
+                    <div className="grid grid-cols-5 gap-2">
+                      {minimumStockPresets.map((preset) => (
+                        <Button
+                          key={preset}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="border-white bg-white text-slate-700 hover:bg-slate-100"
+                          onClick={() =>
+                            form.setValue("minimumStock", preset, {
+                              shouldDirty: true,
+                              shouldValidate: true
+                            })
+                          }
+                        >
+                          {preset}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-white/90 px-4 py-4 text-sm text-slate-600">
+                    <p className="font-medium text-slate-950">Hinweis zum Archivstatus</p>
+                    <p className="mt-1">
+                      Archivieren laesst Historie und Buchungen intakt. Fuer den Alltag ist das meist besser als Loeschen.
+                    </p>
+                  </div>
+                </section>
+              </div>
+
+              <section className="space-y-4 rounded-2xl border border-border/70 bg-slate-50/80 p-5">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold text-slate-900">Zusatzinformationen</h3>
+                  <p className="text-sm text-slate-500">Alles, was im Tagesgeschaeft bei Einkauf, Identifikation und Rueckfragen hilft.</p>
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="manufacturerNumber">Hersteller-Nr.</Label>
+                    <Input id="manufacturerNumber" placeholder="Optional" {...form.register("manufacturerNumber")} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="supplierNumber">Lieferanten-Nr.</Label>
+                    <Input id="supplierNumber" placeholder="Optional" {...form.register("supplierNumber")} />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-3">
+                    <Label htmlFor="description">Beschreibung</Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Kurzbeschreibung fuer Lager, Admins oder Scanner-zuordnung"
+                      className="min-h-[120px]"
+                      {...form.register("description")}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-1">
                 <Button type="submit" disabled={isPending}>
                   {isPending ? "Speichert..." : selectedArticle ? "Aenderungen speichern" : "Artikel anlegen"}
                 </Button>
@@ -564,13 +534,15 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
                     type="button"
                     variant="ghost"
                     onClick={() => {
-                      void toggleArchive(selectedArticle);
+                      setSelectedArticleId(null);
+                      form.reset(emptyValues(locationFilter !== "all" ? locationFilter : locations[0]?.id ?? ""));
                     }}
                   >
-                    {selectedArticle.isArchived ? "Artikel reaktivieren" : "Artikel archivieren"}
+                    Bearbeitung verlassen
                   </Button>
                 ) : null}
               </div>
+
               <datalist id="article-category-options">
                 {categories.map((category) => (
                   <option key={category} value={category} />
@@ -580,6 +552,165 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-white/80 bg-white/90 shadow-sm">
+        <CardHeader className="gap-4">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+            <div className="space-y-2">
+              <CardTitle>Artikelbestand und Pflege</CardTitle>
+              <CardDescription>
+                Suche, Filter und Direktwahl in einer grossen Arbeitsflaeche. Ein Klick auf einen Eintrag springt zur Bearbeitung oben.
+              </CardDescription>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-secondary/60 px-4 py-3 text-sm text-slate-600">
+              <p>
+                <span className="font-semibold text-slate-950">{formatQuantity(filteredArticles.length)}</span> Artikel sichtbar
+              </p>
+              <p>
+                <span className="font-semibold text-slate-950">{formatQuantity(categories.length)}</span> Kategorien im Bestand
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_240px_200px_220px_auto]">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                className="pl-9"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Suche nach Name, Barcode, Zusatz-Barcode, Kategorie oder Standort"
+              />
+            </div>
+
+            <Select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}>
+              <option value="all">Alle Standorte</option>
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name} ({location.code})
+                </option>
+              ))}
+            </Select>
+
+            <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
+              <option value="all">Alle Stati</option>
+              <option value="active">Nur aktiv</option>
+              <option value="attention">Aufmerksamkeit</option>
+              <option value="archived">Nur archiviert</option>
+            </Select>
+
+            <Select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+              <option value="all">Alle Kategorien</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </Select>
+
+            <Button className="xl:min-w-[180px]" onClick={startNewArticle}>
+              <Plus className="mr-2 h-4 w-4" />
+              Neuer Artikel
+            </Button>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {filteredArticles.length ? (
+            <div className="overflow-hidden rounded-xl border border-border">
+              <div className="max-h-[calc(100vh-24rem)] overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Artikel</TableHead>
+                      <TableHead>Kategorie</TableHead>
+                      <TableHead>Standort</TableHead>
+                      <TableHead>Bestand</TableHead>
+                      <TableHead>Minimum</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Aktion</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredArticles.map((article) => {
+                      const attention = isLowStock(article);
+                      const selected = selectedArticleId === article.id;
+
+                      return (
+                        <TableRow
+                          key={article.id}
+                          className={cn("cursor-pointer transition", selected ? "bg-primary/5" : "hover:bg-slate-50")}
+                          onClick={() => editArticle(article)}
+                        >
+                          <TableCell className="min-w-[260px]">
+                            <div className="space-y-1">
+                              <p className="font-medium text-slate-950">{article.name}</p>
+                              <p className="text-xs text-slate-500">Barcode {article.barcode}</p>
+                              {article.additionalBarcodes.length ? (
+                                <p className="text-xs text-slate-500">
+                                  + {formatQuantity(article.additionalBarcodes.length)} weitere Barcodes
+                                </p>
+                              ) : null}
+                              {article.description ? <p className="line-clamp-1 text-xs text-slate-500">{article.description}</p> : null}
+                            </div>
+                          </TableCell>
+                          <TableCell>{article.category}</TableCell>
+                          <TableCell>
+                            <span className="inline-flex items-center gap-2 text-sm text-slate-700">
+                              <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                              {article.locationName}
+                            </span>
+                          </TableCell>
+                          <TableCell className="font-medium">{formatQuantity(article.quantity)}</TableCell>
+                          <TableCell>{formatQuantity(article.minimumStock)}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-2">
+                              {article.isArchived ? <Badge variant="muted">Archiviert</Badge> : <Badge variant="success">Aktiv</Badge>}
+                              {attention ? <Badge variant="warning">Unter Minimum</Badge> : null}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  editArticle(article);
+                                }}
+                              >
+                                Bearbeiten
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void toggleArchive(article);
+                                }}
+                              >
+                                {article.isArchived ? "Reaktivieren" : "Archivieren"}
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border bg-slate-50/80 px-6 py-10 text-center">
+              <p className="text-base font-medium text-slate-900">Keine passenden Artikel gefunden.</p>
+              <p className="mt-2 text-sm text-slate-500">
+                Passe Suche oder Filter an oder lege direkt einen neuen Artikel an.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
