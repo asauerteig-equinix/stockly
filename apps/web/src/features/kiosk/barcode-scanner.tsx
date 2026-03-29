@@ -14,6 +14,7 @@ const SCAN_ZONE_WIDTH_RATIO = 0.74;
 const SCAN_ZONE_HEIGHT_RATIO = 0.34;
 const SCAN_INTERVAL_MS = 140;
 const DUPLICATE_WINDOW_MS = 1500;
+const SCAN_WINDOW_MS = 10000;
 
 const scannerHints = new Map<DecodeHintType, unknown>([
   [DecodeHintType.TRY_HARDER, true],
@@ -51,21 +52,38 @@ function isExpectedDecodeMiss(scanError: unknown) {
   return errorName === "NotFoundException" || errorName === "ChecksumException" || errorName === "FormatException";
 }
 
+function isPlausibleBarcodeCandidate(value: string) {
+  if (value.length < 4) {
+    return false;
+  }
+
+  return new Set(value).size > 1;
+}
+
 export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const onDetectedRef = useRef(onDetected);
+  const autoStopTimeoutRef = useRef<number | null>(null);
+  const countdownIntervalRef = useRef<number | null>(null);
   const lastDetectedRef = useRef<{ barcode: string; timestamp: number }>({
     barcode: "",
     timestamp: 0
   });
   const [active, setActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [remainingMs, setRemainingMs] = useState(0);
 
   useEffect(() => {
     onDetectedRef.current = onDetected;
   }, [onDetected]);
+
+  useEffect(() => {
+    return () => {
+      clearScanWindowTimers();
+    };
+  }, []);
 
   async function ensureAudioContext() {
     if (typeof window === "undefined" || !window.AudioContext) {
@@ -116,6 +134,50 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
 
     oscillator.start(startAt);
     oscillator.stop(startAt + (type === "success" ? 0.18 : 0.22));
+  }
+
+  function clearScanWindowTimers() {
+    if (autoStopTimeoutRef.current) {
+      clearTimeout(autoStopTimeoutRef.current);
+      autoStopTimeoutRef.current = null;
+    }
+
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+  }
+
+  function stopTimedScan() {
+    clearScanWindowTimers();
+    setRemainingMs(0);
+    setActive(false);
+  }
+
+  async function startTimedScan() {
+    await ensureAudioContext();
+
+    lastDetectedRef.current = { barcode: "", timestamp: 0 };
+    setError(null);
+
+    clearScanWindowTimers();
+
+    const deadline = Date.now() + SCAN_WINDOW_MS;
+    setRemainingMs(SCAN_WINDOW_MS);
+    setActive(true);
+
+    autoStopTimeoutRef.current = window.setTimeout(() => {
+      stopTimedScan();
+    }, SCAN_WINDOW_MS);
+
+    countdownIntervalRef.current = window.setInterval(() => {
+      const nextRemaining = Math.max(0, deadline - Date.now());
+      setRemainingMs(nextRemaining);
+
+      if (nextRemaining <= 0) {
+        clearScanWindowTimers();
+      }
+    }, 200);
   }
 
   function explainScannerError(scannerError?: unknown) {
@@ -193,7 +255,7 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
     async function handleDetectedBarcode(rawValue: string) {
       const normalizedBarcode = normalizeDetectedBarcode(rawValue);
 
-      if (!normalizedBarcode) {
+      if (!normalizedBarcode || !isPlausibleBarcodeCandidate(normalizedBarcode)) {
         return;
       }
 
@@ -309,24 +371,25 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="font-medium text-white">Live-Scanner</p>
-          <p className="text-sm text-slate-400">Scanner bleibt aktiv. Hoher Ton bei Treffer, tiefer Ton bei unbekanntem Code.</p>
+          <p className="text-sm text-slate-400">Scan startet bewusst per Klick auf die Flaeche und stoppt nach 10 Sekunden automatisch.</p>
         </div>
-        <Button
-          variant={active ? "destructive" : "secondary"}
-          onClick={async () => {
-            if (!active) {
-              await ensureAudioContext();
-              lastDetectedRef.current = { barcode: "", timestamp: 0 };
-            }
-
-            setActive((value) => !value);
-          }}
-        >
-          {active ? "Scanner stoppen" : "Scanner starten"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {active ? (
+            <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-cyan-100">
+              {Math.max(1, Math.ceil(remainingMs / 1000))}s aktiv
+            </span>
+          ) : null}
+          <Button variant={active ? "destructive" : "secondary"} onClick={active ? stopTimedScan : () => void startTimedScan()}>
+            {active ? "Scanner stoppen" : "10s Scan starten"}
+          </Button>
+        </div>
       </div>
 
-      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900">
+      <button
+        type="button"
+        className="relative block w-full overflow-hidden rounded-3xl border border-white/10 bg-slate-900 text-left"
+        onClick={() => void startTimedScan()}
+      >
         <video ref={videoRef} className="aspect-video w-full object-cover" muted playsInline />
         <canvas ref={canvasRef} className="hidden" aria-hidden />
         <div className="pointer-events-none absolute inset-0">
@@ -351,14 +414,26 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
               </div>
             </div>
           </div>
+          {!active ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-950/48">
+              <div className="rounded-3xl border border-white/10 bg-slate-950/82 px-5 py-4 text-center shadow-xl">
+                <p className="text-sm font-medium text-white">Zum Scannen hier tippen oder klicken</p>
+                <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-300">Aktiv fuer 10 Sekunden</p>
+              </div>
+            </div>
+          ) : null}
         </div>
-      </div>
+      </button>
 
       {active ? (
         <p className="text-sm text-cyan-200">
-          Scanner aktiv. Gelesen wird vor allem der markierte Mittelbereich mit der Linie.
+          Scanner aktiv. Gelesen wird nur im markierten Mittelbereich und danach automatisch wieder gestoppt.
         </p>
-      ) : null}
+      ) : (
+        <p className="text-sm text-slate-400">
+          Kein Dauer-Scan mehr. Die Kamera wertet erst nach einem bewussten Klick auf die Scanflaeche aus.
+        </p>
+      )}
       {error ? <p className="rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">{error}</p> : null}
     </div>
   );
