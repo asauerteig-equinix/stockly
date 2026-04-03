@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Camera, ChevronDown, RotateCcw, ScanLine, Settings2, X } from "lucide-react";
+import { Camera, CheckCircle2, ChevronDown, RotateCcw, ScanLine, Settings2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,18 @@ type KioskTerminalProps = {
   usageReasons: string[];
   articles: ArticleResult[];
   popularArticleIds: string[];
+};
+
+type FeedbackTone = "success" | "error" | "info";
+
+type BookingSuccess = {
+  action: "TAKE" | "RETURN";
+  articleId: string;
+  articleName: string;
+  category: string;
+  quantity: number;
+  balanceQuantity: number;
+  createdAt: number;
 };
 
 const PATCH_PATTERNS = [/\bpatch\b/i, /\bpatchkabel\b/i, /\blc[-/ ]?lc\b/i, /\bsc[-/ ]?sc\b/i, /\bcat\d/i];
@@ -142,6 +154,14 @@ function resolveInitialCategory(articles: ArticleResult[], popularArticleIds: st
   return groupArticlesByCategory(orderedArticles)[0]?.[0] ?? null;
 }
 
+function getActionLabel(action: "TAKE" | "RETURN") {
+  return action === "TAKE" ? "Entnahme" : "Rueckgabe";
+}
+
+function getActionPastTense(action: "TAKE" | "RETURN") {
+  return action === "TAKE" ? "entnommen" : "zurueckgebucht";
+}
+
 export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds }: KioskTerminalProps) {
   const router = useRouter();
   const [catalogue, setCatalogue] = useState<ArticleResult[]>(articles);
@@ -156,10 +176,13 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
   const [resetPin, setResetPin] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   const [servicePanelOpen, setServicePanelOpen] = useState(false);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string | null }>({
-    tone: "success",
+  const [feedback, setFeedback] = useState<{ tone: FeedbackTone; message: string | null }>({
+    tone: "info",
     message: null
   });
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [bookingSuccess, setBookingSuccess] = useState<BookingSuccess | null>(null);
+  const [pendingAction, setPendingAction] = useState<"TAKE" | "RETURN" | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const popularityRank = useMemo(() => createPopularityRank(popularArticleIds), [popularArticleIds]);
@@ -224,12 +247,38 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
     }
   }, [groupedArticles, selectedArticleId, selectedCategory]);
 
+  useEffect(() => {
+    if (!bookingSuccess) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setBookingSuccess((currentSuccess) =>
+        currentSuccess?.createdAt === bookingSuccess.createdAt ? null : currentSuccess
+      );
+    }, 6500);
+
+    return () => window.clearTimeout(timeout);
+  }, [bookingSuccess]);
+
+  function clearSelectionMessages() {
+    setFeedback((currentFeedback) =>
+      currentFeedback.message ? { tone: "info", message: null } : currentFeedback
+    );
+    setBookingError(null);
+    setBookingSuccess(null);
+  }
+
+  function selectCategory(category: string) {
+    setSelectedCategory(category);
+    setQuantity(1);
+    clearSelectionMessages();
+  }
+
   function selectArticle(articleId: string) {
     setSelectedArticleId(articleId);
     setQuantity(1);
-    setFeedback((currentFeedback) =>
-      currentFeedback.message ? { tone: currentFeedback.tone, message: null } : currentFeedback
-    );
+    clearSelectionMessages();
   }
 
   function selectByBarcode(detectedBarcode: string) {
@@ -245,15 +294,19 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
         tone: "error",
         message: `Barcode ${normalizedDetectedBarcode} erkannt, aber keinem Artikel am Standort zugeordnet.`
       });
+      setBookingError(null);
+      setBookingSuccess(null);
       return false;
     }
 
     setSelectedCategory(normalizeCategory(resolvedArticle.category));
     setSelectedArticleId(resolvedArticle.id);
     setQuantity(1);
+    setBookingError(null);
+    setBookingSuccess(null);
     setFeedback({
       tone: "success",
-      message: `Barcode ${normalizedDetectedBarcode} erkannt. Artikel wurde uebernommen.`
+      message: `Barcode ${normalizedDetectedBarcode} erkannt. ${resolvedArticle.name} wurde fuer die Buchung uebernommen.`
     });
     return true;
   }
@@ -270,31 +323,49 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
 
   function book(action: "TAKE" | "RETURN") {
     if (!selectedArticle) {
-      setFeedback({ tone: "error", message: "Bitte zuerst einen Artikel auswaehlen." });
+      setBookingError("Bitte zuerst einen Artikel auswaehlen.");
+      setBookingSuccess(null);
       return;
     }
+
+    const articleToBook = selectedArticle;
+    const quantityToBook = quantity;
+    const usageReasonToBook = usageReason;
+
+    setPendingAction(action);
+    setBookingError(null);
 
     startTransition(async () => {
       try {
         const response = await fetchJson<{ balance: { quantity: number } }>("/api/kiosk/book", {
           method: "POST",
           body: JSON.stringify({
-            articleId: selectedArticle.id,
-            quantity,
+            articleId: articleToBook.id,
+            quantity: quantityToBook,
             action,
-            usageReason: action === "TAKE" ? usageReason : null,
+            usageReason: action === "TAKE" ? usageReasonToBook : null,
             note: null
           })
         });
 
-        updateArticleQuantity(selectedArticle.id, response.balance.quantity);
+        updateArticleQuantity(articleToBook.id, response.balance.quantity);
         setQuantity(1);
-        setFeedback({
-          tone: "success",
-          message: action === "TAKE" ? "Entnahme erfolgreich gebucht." : "Rueckgabe erfolgreich gebucht."
+        setFeedback({ tone: "info", message: null });
+        setBookingError(null);
+        setBookingSuccess({
+          action,
+          articleId: articleToBook.id,
+          articleName: articleToBook.name,
+          category: articleToBook.category,
+          quantity: quantityToBook,
+          balanceQuantity: response.balance.quantity,
+          createdAt: Date.now()
         });
       } catch (error) {
-        setFeedback({ tone: "error", message: error instanceof Error ? error.message : "Buchung fehlgeschlagen." });
+        setBookingSuccess(null);
+        setBookingError(error instanceof Error ? error.message : "Buchung fehlgeschlagen.");
+      } finally {
+        setPendingAction(null);
       }
     });
   }
@@ -316,26 +387,38 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">{kiosk.locationCode}</Badge>
-          <Badge variant="muted" className="bg-white/10 text-slate-100">
-            {kiosk.locationName}
-          </Badge>
-          <Badge variant="success">Kiosk aktiv</Badge>
-        </div>
+    <div className="mx-auto max-w-6xl space-y-5">
+      <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 text-white shadow-[0_20px_80px_rgba(2,6,23,0.2)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">{kiosk.locationCode}</Badge>
+              <Badge variant="muted" className="bg-white/10 text-slate-100">
+                {kiosk.locationName}
+              </Badge>
+              <Badge variant="success">Kiosk aktiv</Badge>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">Kiosk Workflow</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Artikel auswaehlen und direkt buchen</h1>
+              <p className="mt-2 max-w-3xl text-sm text-slate-300">
+                Manuell ueber Kategorien oder bei Bedarf per Scanner. Die Buchung passiert direkt im gleichen Ablauf und
+                der Abschluss wird deutlich bestaetigt.
+              </p>
+            </div>
+          </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 w-11 border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
-          onClick={() => setServicePanelOpen((currentValue) => !currentValue)}
-          aria-label="Service-Menue"
-        >
-          {servicePanelOpen ? <X className="h-4 w-4" /> : <Settings2 className="h-4 w-4" />}
-        </Button>
-      </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-11 shrink-0 border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
+            onClick={() => setServicePanelOpen((currentValue) => !currentValue)}
+            aria-label="Service-Menue"
+          >
+            {servicePanelOpen ? <X className="h-4 w-4" /> : <Settings2 className="h-4 w-4" />}
+          </Button>
+        </div>
+      </section>
 
       {feedback.message ? <FormFeedback message={feedback.message} tone={feedback.tone} /> : null}
 
@@ -356,20 +439,76 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
               type="button"
               variant="outline"
               className="w-full border-white/10 bg-transparent text-white hover:bg-white/5"
+              disabled={isPending}
               onClick={resetKiosk}
             >
-              Kiosk zuruecksetzen
+              {isPending ? "Setzt zurueck..." : "Kiosk zuruecksetzen"}
             </Button>
           </CardContent>
         </Card>
       ) : null}
+      <Card className="border-white/10 bg-slate-950/82 text-white">
+        <CardHeader className="gap-4 border-white/10">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">1. Artikel finden</p>
+              <CardTitle className="mt-2 text-xl">Kategorie waehlen oder Scanner oeffnen</CardTitle>
+              <CardDescription className="text-slate-400">
+                Die manuelle Auswahl bleibt bewusst im Vordergrund. Der Scanner ist als schnelle Zusatzfunktion
+                einklappbar.
+              </CardDescription>
+            </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_420px]">
-        <div className="space-y-5">
-          <Card className="overflow-hidden border-white/10 bg-slate-950/82 text-white">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="muted" className="bg-white/10 text-slate-200">
+                {formatQuantity(groupedArticles.length)} Kategorien
+              </Badge>
+              {patchFocusedCount ? (
+                <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                  {formatQuantity(patchFocusedCount)} Patchkabel im Fokus
+                </Badge>
+              ) : null}
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-5">
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-white">Kategorien</p>
+            <div className="flex flex-wrap gap-2">
+              {groupedArticles.map(([category, categoryArticles]) => {
+                const patchCategory = isPatchFocusedCategory(category, categoryArticles);
+
+                return (
+                  <Button
+                    key={category}
+                    type="button"
+                    size="sm"
+                    variant={selectedCategory === category ? "default" : "outline"}
+                    className={
+                      selectedCategory === category
+                        ? "gap-2"
+                        : cn(
+                            "gap-2 border-white/10 bg-slate-950/70 text-white hover:bg-white/5",
+                            patchCategory ? "border-cyan-400/25 text-cyan-100" : ""
+                          )
+                    }
+                    onClick={() => selectCategory(category)}
+                  >
+                    <span>{category}</span>
+                    <span className="text-[11px] uppercase tracking-[0.12em] opacity-80">
+                      {formatQuantity(categoryArticles.length)}
+                    </span>
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-slate-900/60">
             <button
               type="button"
-              className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-white/[0.03]"
+              className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-white/[0.03]"
               onClick={() => setScannerOpen((currentValue) => !currentValue)}
               aria-expanded={scannerOpen}
               aria-controls="kiosk-scanner-panel"
@@ -386,21 +525,15 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                   <Camera className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-lg font-semibold text-white">Scanner</p>
+                  <p className="font-semibold text-white">Scanner verwenden</p>
                   <p className="mt-1 text-sm text-slate-400">
-                    Standardmaessig geschlossen. Nur bei Bedarf oeffnen, damit die manuelle Buchung im Fokus bleibt.
+                    Standardmaessig geschlossen. Nur oeffnen, wenn ein Artikel direkt per Barcode uebernommen werden soll.
                   </p>
                 </div>
               </div>
 
               <div className="flex shrink-0 items-center gap-3">
-                <Badge
-                  variant="muted"
-                  className={cn(
-                    "bg-white/10",
-                    scannerOpen ? "text-cyan-100" : "text-slate-200"
-                  )}
-                >
+                <Badge variant="muted" className={cn("bg-white/10", scannerOpen ? "text-cyan-100" : "text-slate-200")}>
                   {scannerOpen ? "Offen" : "Geschlossen"}
                 </Badge>
                 <ChevronDown
@@ -414,186 +547,188 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                 <BarcodeScanner onDetected={selectByBarcode} />
               </div>
             ) : null}
-          </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-          <Card className="border-white/10 bg-slate-950/82 text-white">
-            <CardHeader className="gap-4 border-white/10">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="text-lg">Artikel nach Kategorien</CardTitle>
-                  <CardDescription className="text-slate-400">
-                    Kategorien antippen, danach erscheint direkt die passende Artikelliste. Patchkabel starten zuerst.
-                  </CardDescription>
-                </div>
+      <Card className="border-white/10 bg-slate-950/82 text-white">
+        <CardHeader className="gap-4 border-white/10">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">2. Artikel waehlen</p>
+              <CardTitle className="mt-2 text-xl">
+                {selectedCategory ? `Artikel in ${selectedCategory}` : "Artikel der gewaehlten Kategorie"}
+              </CardTitle>
+              <CardDescription className="text-slate-400">
+                Tippe den passenden Artikel an. Danach erscheint direkt darunter der Buchungsbereich.
+              </CardDescription>
+            </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="muted" className="bg-white/10 text-slate-200">
-                    {formatQuantity(filteredArticles.length)} Artikel
-                  </Badge>
-                  <Badge className="border border-white/10 bg-white/5 text-slate-100">
-                    {formatQuantity(groupedArticles.length)} Kategorien
-                  </Badge>
-                </div>
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="muted" className="bg-white/10 text-slate-200">
+                {formatQuantity(filteredArticles.length)} Artikel sichtbar
+              </Badge>
+              {selectedCategory && isPatchFocusedCategory(selectedCategory, filteredArticles) ? (
+                <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">Patchkabel Fokus</Badge>
+              ) : null}
+            </div>
+          </div>
+        </CardHeader>
 
-              <div className="flex flex-wrap gap-2">
-                {groupedArticles.map(([category, categoryArticles]) => {
-                  const patchCategory = isPatchFocusedCategory(category, categoryArticles);
+        <CardContent>
+          {filteredArticles.length ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {filteredArticles.map((article) => {
+                const isSelected = selectedArticle?.id === article.id;
+                const isFreshlyBooked = bookingSuccess?.articleId === article.id;
 
-                  return (
-                    <Button
-                      key={category}
-                      type="button"
-                      size="sm"
-                      variant={selectedCategory === category ? "default" : "outline"}
-                      className={
-                        selectedCategory === category
-                          ? "gap-2"
-                          : cn(
-                              "gap-2 border-white/10 bg-slate-950/70 text-white hover:bg-white/5",
-                              patchCategory ? "border-cyan-400/25 text-cyan-100" : ""
-                            )
-                      }
-                      onClick={() => setSelectedCategory(category)}
-                    >
-                      <span>{category}</span>
-                      <span className="text-[11px] uppercase tracking-[0.12em] opacity-80">
-                        {formatQuantity(categoryArticles.length)}
-                      </span>
-                    </Button>
-                  );
-                })}
-                {patchFocusedCount ? (
-                  <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
-                    {formatQuantity(patchFocusedCount)} Patchkabel im Fokus
-                  </Badge>
-                ) : null}
-              </div>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              {groupedArticles.length ? (
-                <section
-                  className={cn(
-                    "rounded-3xl border p-4",
-                    selectedCategory && isPatchFocusedCategory(selectedCategory, filteredArticles)
-                      ? "border-cyan-400/20 bg-gradient-to-br from-cyan-400/10 via-slate-950/70 to-slate-950/95"
-                      : "border-white/10 bg-slate-900/55"
-                  )}
-                >
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white">
-                        {selectedCategory ?? "Keine Kategorie"}
-                      </h3>
-                      {selectedCategory && isPatchFocusedCategory(selectedCategory, filteredArticles) ? (
-                        <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
-                          Patchkabel Fokus
-                        </Badge>
-                      ) : null}
+                return (
+                  <button
+                    key={article.id}
+                    type="button"
+                    onClick={() => selectArticle(article.id)}
+                    className={cn(
+                      "rounded-[1.75rem] border px-4 py-4 text-left transition",
+                      isSelected
+                        ? "border-cyan-400/40 bg-cyan-400/12"
+                        : "border-white/10 bg-slate-900/80 hover:border-cyan-400/30 hover:bg-slate-900",
+                      isFreshlyBooked ? "border-emerald-300/35 ring-1 ring-emerald-300/30" : ""
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-white">{article.name}</p>
+                        <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{article.barcode}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        {isSelected ? (
+                          <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">Ausgewaehlt</Badge>
+                        ) : null}
+                        {isFreshlyBooked ? <Badge variant="success">Gerade gebucht</Badge> : null}
+                        {!isFreshlyBooked && isAttention(article) ? <Badge variant="warning">Niedrig</Badge> : null}
+                      </div>
                     </div>
 
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                      {formatQuantity(filteredArticles.length)} Artikel
-                    </p>
-                  </div>
+                    {article.description ? <p className="mt-3 text-sm text-slate-300">{article.description}</p> : null}
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {filteredArticles.map((article) => (
-                      <button
-                        key={article.id}
-                        type="button"
-                        onClick={() => selectArticle(article.id)}
-                        className={cn(
-                          "rounded-2xl border px-4 py-4 text-left transition",
-                          selectedArticle?.id === article.id
-                            ? "border-cyan-400/40 bg-cyan-400/12"
-                            : selectedCategory && isPatchFocusedCategory(selectedCategory, filteredArticles)
-                              ? "border-cyan-400/15 bg-slate-950/85 hover:border-cyan-400/35 hover:bg-slate-950"
-                              : "border-white/10 bg-slate-950/80 hover:border-cyan-400/30 hover:bg-slate-900"
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-semibold text-white">{article.name}</p>
-                            <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{article.barcode}</p>
-                          </div>
-                          {isAttention(article) ? <Badge variant="warning">Niedrig</Badge> : <Badge variant="success">OK</Badge>}
-                        </div>
+                    <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-300">
+                      <span>Bestand {formatQuantity(article.quantity)}</span>
+                      <span>Min. {formatQuantity(article.minimumStock)}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-dashed border-white/15 bg-slate-900/50 p-8 text-center">
+              <p className="text-base font-medium text-white">Keine Artikel in dieser Kategorie.</p>
+              <p className="mt-2 text-sm text-slate-400">
+                Waehle oben eine andere Kategorie oder oeffne den Scanner fuer die direkte Uebernahme.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-                        {article.description ? <p className="mt-3 text-sm text-slate-300">{article.description}</p> : null}
-
-                        <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-300">
-                          <span>Bestand {formatQuantity(article.quantity)}</span>
-                          <span>Min. {formatQuantity(article.minimumStock)}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              ) : (
-                <div className="rounded-3xl border border-dashed border-white/15 bg-slate-900/50 p-8 text-center">
-                  <p className="text-base font-medium text-white">Keine Kategorien vorhanden.</p>
-                  <p className="mt-2 text-sm text-slate-400">
-                    Sobald Artikel Kategorien haben, wird hier die passende Artikelliste angezeigt.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="border-white/10 bg-slate-950/88 text-white xl:sticky xl:top-4">
-          <CardHeader className="gap-3 border-white/10">
-            <div className="flex items-center gap-2">
+      <Card className="border-white/10 bg-slate-950/88 text-white">
+        <CardHeader className="gap-4 border-white/10">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">3. Buchung durchfuehren</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <ScanLine className="h-4 w-4 text-cyan-200" />
-              <CardTitle>Buchung</CardTitle>
+              <CardTitle className="text-xl">Buchung direkt im gleichen Ablauf</CardTitle>
             </div>
             <CardDescription className="text-slate-400">
-              Artikel waehlen, Menge festlegen und direkt buchen.
+              Artikel pruefen, Menge setzen und Entnahme oder Rueckgabe sofort bestaetigen.
             </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {selectedArticle ? (
-              <div className="rounded-3xl border border-cyan-500/20 bg-cyan-500/10 p-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
-                    {normalizeCategory(selectedArticle.category)}
-                  </Badge>
-                  {isPatchFocusedArticle(selectedArticle) ? (
-                    <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">Patchkabel Fokus</Badge>
-                  ) : null}
-                  {isAttention(selectedArticle) ? <Badge variant="warning">Unter Minimum</Badge> : <Badge variant="success">Im Rahmen</Badge>}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {bookingSuccess ? (
+            <div className="rounded-[2rem] border border-emerald-300/25 bg-gradient-to-br from-emerald-400/20 via-emerald-400/10 to-slate-950/95 p-6 shadow-[0_24px_60px_rgba(16,185,129,0.12)]">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-100">Buchung erfolgreich</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-white">
+                    {formatQuantity(bookingSuccess.quantity)} Stueck {bookingSuccess.articleName}{" "}
+                    {getActionPastTense(bookingSuccess.action)}
+                  </h2>
+                  <p className="mt-2 text-sm text-emerald-50/90">
+                    Neuer Bestand: {formatQuantity(bookingSuccess.balanceQuantity)} Stueck. Der Kiosk ist direkt fuer die
+                    naechste Buchung bereit.
+                  </p>
                 </div>
-                <h2 className="mt-3 text-2xl font-semibold text-white">{selectedArticle.name}</h2>
-                {selectedArticle.description ? <p className="mt-2 text-sm text-slate-300">{selectedArticle.description}</p> : null}
-                <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl bg-slate-900/70 p-4">
-                    <p className="text-sm text-slate-400">Bestand</p>
-                    <p className="mt-1 text-3xl font-semibold text-white">{formatQuantity(selectedArticle.quantity)}</p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-900/70 p-4">
-                    <p className="text-sm text-slate-400">Mindestbestand</p>
-                    <p className="mt-1 text-3xl font-semibold text-white">{formatQuantity(selectedArticle.minimumStock)}</p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-900/70 p-4">
-                    <p className="text-sm text-slate-400">Barcode</p>
-                    <p className="mt-1 break-all text-sm font-medium text-white">{selectedArticle.barcode}</p>
-                    {selectedArticle.additionalBarcodes.length ? (
-                      <p className="mt-2 text-xs text-slate-400">
-                        + {formatQuantity(selectedArticle.additionalBarcodes.length)} weitere Scan-Codes
-                      </p>
-                    ) : null}
-                  </div>
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-emerald-200/25 bg-emerald-300/10">
+                  <CheckCircle2 className="h-8 w-8 text-emerald-100" />
                 </div>
               </div>
-            ) : (
-              <div className="rounded-3xl border border-dashed border-white/15 bg-slate-900/50 p-8 text-center text-slate-400">
-                Artikel aus der kategorisierten Liste waehlen oder bei Bedarf den Scanner oeffnen.
-              </div>
-            )}
 
-            <div className="space-y-3">
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Badge className="border border-emerald-200/20 bg-emerald-200/10 text-emerald-50">
+                  {getActionLabel(bookingSuccess.action)}
+                </Badge>
+                <Badge className="border border-emerald-200/20 bg-emerald-200/10 text-emerald-50">
+                  {normalizeCategory(bookingSuccess.category)}
+                </Badge>
+                <Badge className="border border-emerald-200/20 bg-emerald-200/10 text-emerald-50">
+                  Bestand jetzt {formatQuantity(bookingSuccess.balanceQuantity)}
+                </Badge>
+              </div>
+            </div>
+          ) : null}
+
+          {bookingError ? <FormFeedback message={bookingError} tone="error" /> : null}
+
+          {selectedArticle ? (
+            <div className="rounded-[2rem] border border-cyan-500/20 bg-cyan-500/10 p-5">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="max-w-3xl">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+                      {normalizeCategory(selectedArticle.category)}
+                    </Badge>
+                    {isPatchFocusedArticle(selectedArticle) ? (
+                      <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">Patchkabel Fokus</Badge>
+                    ) : null}
+                    {isAttention(selectedArticle) ? <Badge variant="warning">Unter Minimum</Badge> : <Badge variant="success">Im Rahmen</Badge>}
+                  </div>
+                  <h2 className="mt-3 text-3xl font-semibold text-white">{selectedArticle.name}</h2>
+                  {selectedArticle.description ? <p className="mt-2 text-sm text-slate-300">{selectedArticle.description}</p> : null}
+                </div>
+
+                <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-slate-300">
+                  Artikel ausgewaehlt und bereit zur Buchung
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl bg-slate-900/70 p-4">
+                  <p className="text-sm text-slate-400">Bestand</p>
+                  <p className="mt-1 text-3xl font-semibold text-white">{formatQuantity(selectedArticle.quantity)}</p>
+                </div>
+                <div className="rounded-2xl bg-slate-900/70 p-4">
+                  <p className="text-sm text-slate-400">Mindestbestand</p>
+                  <p className="mt-1 text-3xl font-semibold text-white">{formatQuantity(selectedArticle.minimumStock)}</p>
+                </div>
+                <div className="rounded-2xl bg-slate-900/70 p-4">
+                  <p className="text-sm text-slate-400">Barcode</p>
+                  <p className="mt-1 break-all text-sm font-medium text-white">{selectedArticle.barcode}</p>
+                  {selectedArticle.additionalBarcodes.length ? (
+                    <p className="mt-2 text-xs text-slate-400">
+                      + {formatQuantity(selectedArticle.additionalBarcodes.length)} weitere Scan-Codes
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-[2rem] border border-dashed border-white/15 bg-slate-900/50 p-8 text-center text-slate-400">
+              Erst einen Artikel auswaehlen oder per Scanner uebernehmen, dann erscheint hier die Buchung.
+            </div>
+          )}
+
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="space-y-3 rounded-[1.75rem] border border-white/10 bg-slate-900/55 p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-medium text-white">Menge</p>
                 <Badge variant="muted" className="bg-white/10 text-slate-200">
@@ -607,6 +742,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                   size="lg"
                   variant="outline"
                   className="h-16 border-white/10 bg-slate-950/70 text-3xl text-white hover:bg-white/5"
+                  disabled={!selectedArticle || isPending}
                   onClick={() => adjustQuantity(-1)}
                 >
                   -
@@ -619,6 +755,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                   size="lg"
                   variant="outline"
                   className="h-16 border-white/10 bg-slate-950/70 text-3xl text-white hover:bg-white/5"
+                  disabled={!selectedArticle || isPending}
                   onClick={() => adjustQuantity(1)}
                 >
                   +
@@ -632,6 +769,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                     type="button"
                     variant="outline"
                     className="h-12 border-white/10 bg-slate-950/70 text-white hover:bg-white/5"
+                    disabled={!selectedArticle || isPending}
                     onClick={() => setQuantity(preset)}
                   >
                     {preset}
@@ -640,7 +778,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 rounded-[1.75rem] border border-white/10 bg-slate-900/55 p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-medium text-white">Entnahmegrund</p>
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Nur fuer Entnahme</p>
@@ -656,6 +794,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                         ? "justify-start"
                         : "justify-start border-white/10 bg-slate-950/70 text-white hover:bg-white/5"
                     }
+                    disabled={!selectedArticle || isPending}
                     onClick={() => setUsageReason(reason)}
                   >
                     {reason}
@@ -663,24 +802,24 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                 ))}
               </div>
             </div>
+          </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Button size="lg" className="h-16 text-lg" disabled={isPending || !selectedArticle} onClick={() => book("TAKE")}>
-                Entnahme buchen
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-16 border-white/15 bg-transparent text-lg text-white hover:bg-white/5"
-                disabled={isPending || !selectedArticle}
-                onClick={() => book("RETURN")}
-              >
-                Rueckgabe buchen
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Button size="lg" className="h-16 text-lg" disabled={isPending || !selectedArticle} onClick={() => book("TAKE")}>
+              {pendingAction === "TAKE" ? "Entnahme wird gebucht..." : "Entnahme buchen"}
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-16 border-white/15 bg-transparent text-lg text-white hover:bg-white/5"
+              disabled={isPending || !selectedArticle}
+              onClick={() => book("RETURN")}
+            >
+              {pendingAction === "RETURN" ? "Rueckgabe wird gebucht..." : "Rueckgabe buchen"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
