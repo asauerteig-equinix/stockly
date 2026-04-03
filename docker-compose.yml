@@ -39,17 +39,11 @@ services:
     ports:
       - "5600:3000"
     healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "const basePath = (process.env.BASE_PATH ?? '').trim().replace(/^\\/+|\\/+$/g, ''); const prefix = basePath ? '/' + basePath : ''; fetch('http://127.0.0.1:3000' + prefix + '/api/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
-        ]
-      interval: 15s
+      test: ["CMD", "node", "scripts/healthcheck.mjs"]
+      interval: 20s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 120s
 
 volumes:
   stockly_postgres_data:

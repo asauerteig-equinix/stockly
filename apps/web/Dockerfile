@@ -27,4 +27,5 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/package.json ./package.json
 EXPOSE 3000
+HEALTHCHECK --interval=20s --timeout=5s --start-period=120s --retries=10 CMD ["node", "scripts/healthcheck.mjs"]
 CMD ["node", "scripts/bootstrap.mjs"]
