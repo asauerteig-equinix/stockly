@@ -109,6 +109,7 @@ model Article {
   description        String?
   manufacturerNumber String?
   supplierNumber     String?
+  unitPriceCents     Int?
   category           String
   sortOrder          Int               @default(0)
   minimumStock       Int               @default(0)
@@ -222,6 +223,7 @@ model PurchaseOrderItem {
   minimumStockSnapshot     Int           @default(0)
   manufacturerNumberSnapshot String?
   supplierNumberSnapshot   String?
+  unitPriceCentsSnapshot   Int?
   purchaseOrder            PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   article                  Article       @relation(fields: [articleId], references: [id], onDelete: Restrict)
   createdAt                DateTime      @default(now())

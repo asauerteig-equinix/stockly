@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { articlePlaceholderImage } from "@/lib/article-images";
 import { withBasePath } from "@/lib/base-path";
 import { cn } from "@/lib/cn";
+import { formatCurrency } from "@/lib/currency";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatQuantity } from "@/server/format";
 
@@ -32,6 +33,7 @@ type ArticleOption = {
   category: string;
   sortOrder: number;
   imageUrl: string | null;
+  unitPriceCents: number | null;
   quantity: number;
   minimumStock: number;
 };
@@ -63,6 +65,7 @@ type DraftOrder = {
     imageUrl: string | null;
     currentQuantity: number;
     minimumStock: number;
+    unitPriceCents: number | null;
   }>;
 };
 
@@ -159,6 +162,9 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
 
   const totalDraftQuantity = activeDraft?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
   const activeDraftItemCount = activeDraft?.items.length ?? 0;
+  const totalDraftAmountCents =
+    activeDraft?.items.reduce((sum, item) => sum + (item.unitPriceCents ?? 0) * item.quantity, 0) ?? 0;
+  const draftItemsWithoutPrice = activeDraft?.items.filter((item) => item.unitPriceCents === null).length ?? 0;
 
   async function addArticles(articleIds: string[]) {
     if (!selectedLocationId || articleIds.length === 0) {
@@ -468,6 +474,7 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
                             <p className="text-sm text-slate-600">
                               Bestand {formatQuantity(article.quantity)} / Minimum {formatQuantity(article.minimumStock)}
                             </p>
+                            <p className="text-sm text-slate-600">Preis {formatCurrency(article.unitPriceCents, "-")}</p>
                           </div>
                         </div>
                         <div className="mt-4 flex justify-end">
@@ -508,7 +515,7 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
               {activeDraft ? <OrderStatusBadge status="DRAFT" /> : null}
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl bg-secondary/60 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Positionen</p>
                 <p className="mt-1 text-3xl font-semibold text-slate-950">{formatQuantity(activeDraft?.items.length ?? 0)}</p>
@@ -516,6 +523,13 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
               <div className="rounded-2xl bg-secondary/60 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Gesamtmenge</p>
                 <p className="mt-1 text-3xl font-semibold text-slate-950">{formatQuantity(totalDraftQuantity)}</p>
+              </div>
+              <div className="rounded-2xl bg-secondary/60 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Gesamtsumme</p>
+                <p className="mt-1 text-3xl font-semibold text-slate-950">{formatCurrency(totalDraftAmountCents, "0,00 EUR")}</p>
+                {draftItemsWithoutPrice ? (
+                  <p className="mt-1 text-sm text-slate-600">{formatQuantity(draftItemsWithoutPrice)} Positionen ohne Preis</p>
+                ) : null}
               </div>
             </div>
           </CardHeader>
@@ -540,6 +554,9 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
                           <p className="mt-2 text-sm font-semibold text-slate-950">{item.articleName}</p>
                           <p className="mt-1 text-xs text-slate-500">
                             Bestand {formatQuantity(item.currentQuantity)} / Minimum {formatQuantity(item.minimumStock)}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Einzelpreis {formatCurrency(item.unitPriceCents, "Kein Preis")}
                           </p>
                         </div>
                         <Button size="sm" variant="ghost" onClick={() => handleRemoveItem(item.id)}>
@@ -570,6 +587,12 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
                         </Button>
                       </div>
                       <p className="mt-2 text-xs text-slate-500">Vorschlagsmenge {formatQuantity(item.suggestedQuantity)} Stueck</p>
+                      <p className="mt-1 text-xs font-medium text-slate-700">
+                        Positionssumme{" "}
+                        {item.unitPriceCents !== null
+                          ? formatCurrency(item.unitPriceCents * item.quantity, "0,00 EUR")
+                          : "nicht verfuegbar"}
+                      </p>
                     </div>
                   ))}
                 </div>

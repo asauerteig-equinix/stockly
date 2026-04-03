@@ -107,6 +107,7 @@ export default async function OrdersPage() {
           category: article.category,
           sortOrder: article.sortOrder,
           imageUrl: article.imageUrl,
+          unitPriceCents: article.unitPriceCents,
           quantity: article.inventoryBalance?.quantity ?? 0,
           minimumStock: article.minimumStock
         }))}
@@ -139,7 +140,8 @@ export default async function OrdersPage() {
             category: item.categorySnapshot,
             imageUrl: item.imageUrlSnapshot,
             currentQuantity: item.currentQuantitySnapshot,
-            minimumStock: item.minimumStockSnapshot
+            minimumStock: item.minimumStockSnapshot,
+            unitPriceCents: item.unitPriceCentsSnapshot
           }))
         }))}
         history={history.map((order) => ({

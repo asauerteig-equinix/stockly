@@ -65,6 +65,7 @@ export async function POST(request: Request) {
           description: body.description ?? null,
           manufacturerNumber: body.manufacturerNumber ?? null,
           supplierNumber: body.supplierNumber ?? null,
+          unitPriceCents: body.unitPriceCents ?? null,
           category: body.category,
           imageUrl: body.imageUrl || articlePlaceholderImage,
           sortOrder: body.sortOrder,

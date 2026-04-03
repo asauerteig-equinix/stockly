@@ -29,6 +29,43 @@ export function ArticleImportTools() {
     message: null
   });
   const [isPending, startTransition] = useTransition();
+  const [isExporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+
+    try {
+      const response = await fetch(withBasePath("/api/articles/export"), {
+        method: "GET"
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error ?? "Export fehlgeschlagen.");
+      }
+
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("content-disposition") ?? "";
+      const fileNameMatch = contentDisposition.match(/filename="([^"]+)"/i);
+      const fileName = fileNameMatch?.[1] ?? "stockly-articles-export.xlsx";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      setFeedback({ tone: "success", message: "Export wurde vorbereitet." });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Export fehlgeschlagen."
+      });
+    } finally {
+      setExporting(false);
+    }
+  }
 
   function handleImport() {
     const file = fileInputRef.current?.files?.[0];
@@ -89,6 +126,10 @@ export function ArticleImportTools() {
         <Button onClick={handleImport} disabled={isPending}>
           <FileUp className="mr-2 h-4 w-4" />
           {isPending ? "Importiert..." : "Import starten"}
+        </Button>
+        <Button variant="outline" onClick={handleExport} disabled={isExporting}>
+          <Download className="mr-2 h-4 w-4" />
+          {isExporting ? "Exportiert..." : "Artikel exportieren"}
         </Button>
         <Button variant="outline" onClick={downloadTemplate}>
           <Download className="mr-2 h-4 w-4" />

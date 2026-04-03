@@ -9,6 +9,7 @@ export const articleImportTemplateHeaders = [
   "Beschreibung",
   "Herstellernummer",
   "Lieferantennummer",
+  "Preis EUR",
   "Mindestbestand",
   "Aktiv",
   "Bild URL"

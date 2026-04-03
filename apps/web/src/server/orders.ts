@@ -23,6 +23,7 @@ function createSnapshot(article: {
   minimumStock: number;
   manufacturerNumber: string | null;
   supplierNumber: string | null;
+  unitPriceCents: number | null;
   inventoryBalance: { quantity: number } | null;
   location: { settings: { lowStockBuffer: number } | null };
 }) {
@@ -37,7 +38,8 @@ function createSnapshot(article: {
     currentQuantitySnapshot: article.inventoryBalance?.quantity ?? 0,
     minimumStockSnapshot: article.minimumStock,
     manufacturerNumberSnapshot: article.manufacturerNumber,
-    supplierNumberSnapshot: article.supplierNumber
+    supplierNumberSnapshot: article.supplierNumber,
+    unitPriceCentsSnapshot: article.unitPriceCents
   };
 }
 
@@ -125,7 +127,8 @@ export async function upsertDraftOrderItems(input: {
             currentQuantitySnapshot: snapshot.currentQuantitySnapshot,
             minimumStockSnapshot: snapshot.minimumStockSnapshot,
             manufacturerNumberSnapshot: snapshot.manufacturerNumberSnapshot,
-            supplierNumberSnapshot: snapshot.supplierNumberSnapshot
+            supplierNumberSnapshot: snapshot.supplierNumberSnapshot,
+            unitPriceCentsSnapshot: snapshot.unitPriceCentsSnapshot
           }
         });
         continue;

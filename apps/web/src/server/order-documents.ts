@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 
+import { formatCurrency } from "@/lib/currency";
 import { type AuthUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { formatDateTime, formatQuantity } from "@/server/format";
@@ -127,6 +128,11 @@ export async function buildPurchaseOrderPdf(order: PurchaseOrderDocument) {
 
   const pageSize = { width: 595.28, height: 841.89 };
   const margin = 48;
+  const totalOrderAmountCents = order.items.reduce(
+    (sum, item) => sum + (item.unitPriceCentsSnapshot ?? 0) * item.quantity,
+    0
+  );
+  const itemsWithoutPrice = order.items.filter((item) => item.unitPriceCentsSnapshot === null).length;
   let page = pdf.addPage([pageSize.width, pageSize.height]);
   let y = pageSize.height - margin;
 
@@ -182,8 +188,10 @@ export async function buildPurchaseOrderPdf(order: PurchaseOrderDocument) {
     `Erstellt am: ${formatDateTime(order.createdAt)}`,
     `Zuletzt aktualisiert: ${formatDateTime(order.updatedAt)}`,
     `Abgeschlossen am: ${formatDateTime(order.submittedAt)}`,
-    `Positionen: ${formatQuantity(order.items.length)}`
-  ];
+    `Positionen: ${formatQuantity(order.items.length)}`,
+    `Gesamtsumme: ${formatCurrency(totalOrderAmountCents, "0,00 EUR")}`,
+    itemsWithoutPrice ? `Positionen ohne Preis: ${formatQuantity(itemsWithoutPrice)}` : null
+  ].filter((line): line is string => Boolean(line));
 
   for (const line of metaLines) {
     drawTextBlock(line);
@@ -214,6 +222,13 @@ export async function buildPurchaseOrderPdf(order: PurchaseOrderDocument) {
     drawTextBlock(`Barcode: ${item.barcodeSnapshot}`);
     drawTextBlock(
       `Bestellmenge: ${formatQuantity(item.quantity)} | Vorschlag: ${formatQuantity(item.suggestedQuantity)} | Bestand bei Erfassung: ${formatQuantity(item.currentQuantitySnapshot)} | Mindestbestand: ${formatQuantity(item.minimumStockSnapshot)}`
+    );
+    drawTextBlock(
+      `Einzelpreis: ${formatCurrency(item.unitPriceCentsSnapshot, "Kein Preis")} | Positionssumme: ${
+        item.unitPriceCentsSnapshot !== null
+          ? formatCurrency(item.unitPriceCentsSnapshot * item.quantity, "0,00 EUR")
+          : "Nicht verfuegbar"
+      }`
     );
 
     if (item.supplierNumberSnapshot || item.manufacturerNumberSnapshot) {

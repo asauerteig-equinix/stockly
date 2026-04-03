@@ -74,6 +74,7 @@ export default async function ArticlesPage() {
           description: article.description,
           manufacturerNumber: article.manufacturerNumber,
           supplierNumber: article.supplierNumber,
+          unitPriceCents: article.unitPriceCents,
           category: article.category,
           sortOrder: article.sortOrder,
           minimumStock: article.minimumStock,

@@ -24,12 +24,14 @@ import { articlePlaceholderImage } from "@/lib/article-images";
 import { formatBarcodeListInput, parseBarcodeListInput } from "@/lib/barcodes";
 import { withBasePath } from "@/lib/base-path";
 import { cn } from "@/lib/cn";
+import { formatCurrency, formatCurrencyInput, parseCurrencyInputToCents } from "@/lib/currency";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatQuantity } from "@/server/format";
 import { articleSchema } from "@/server/validation";
 
-const articleFormSchema = articleSchema.omit({ additionalBarcodes: true }).extend({
-  additionalBarcodesInput: z.string().default("")
+const articleFormSchema = articleSchema.omit({ additionalBarcodes: true, unitPriceCents: true }).extend({
+  additionalBarcodesInput: z.string().default(""),
+  unitPriceInput: z.string().default("")
 });
 
 type ArticleFormValues = z.infer<typeof articleFormSchema>;
@@ -50,6 +52,7 @@ type ArticleEntry = {
   description: string | null;
   manufacturerNumber: string | null;
   supplierNumber: string | null;
+  unitPriceCents: number | null;
   category: string;
   sortOrder: number;
   minimumStock: number;
@@ -81,6 +84,7 @@ const emptyValues = (locationId: string): ArticleFormValues => ({
   description: "",
   manufacturerNumber: "",
   supplierNumber: "",
+  unitPriceInput: "",
   category: "",
   sortOrder: 0,
   minimumStock: 0,
@@ -173,6 +177,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
         description: selectedArticle.description ?? "",
         manufacturerNumber: selectedArticle.manufacturerNumber ?? "",
         supplierNumber: selectedArticle.supplierNumber ?? "",
+        unitPriceInput: formatCurrencyInput(selectedArticle.unitPriceCents),
         category: selectedArticle.category,
         sortOrder: selectedArticle.sortOrder,
         minimumStock: selectedArticle.minimumStock,
@@ -226,7 +231,8 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
       try {
         const payload = articleSchema.parse({
           ...values,
-          additionalBarcodes: parseBarcodeListInput(values.additionalBarcodesInput)
+          additionalBarcodes: parseBarcodeListInput(values.additionalBarcodesInput),
+          unitPriceCents: parseCurrencyInputToCents(values.unitPriceInput)
         });
 
         if (selectedArticle) {
@@ -452,6 +458,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                       <TableHead>Standort</TableHead>
                       <TableHead>Bestand</TableHead>
                       <TableHead>Minimum</TableHead>
+                      <TableHead>Preis</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Aktion</TableHead>
                     </TableRow>
@@ -496,6 +503,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                           </TableCell>
                           <TableCell className="font-medium">{formatQuantity(article.quantity)}</TableCell>
                           <TableCell>{formatQuantity(article.minimumStock)}</TableCell>
+                          <TableCell>{formatCurrency(article.unitPriceCents, "-")}</TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-2">
                               {article.isArchived ? <Badge variant="muted">Archiviert</Badge> : <Badge variant="success">Aktiv</Badge>}
@@ -558,8 +566,8 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
         open={isEditorOpen}
         onClose={closeEditor}
         title={selectedArticle ? `Artikel bearbeiten` : "Neuer Artikel"}
-        className="max-w-[min(96vw,92rem)]"
-        contentClassName="max-h-[calc(100vh-8rem)] px-0 py-0"
+        className="max-w-[min(94vw,78rem)]"
+        contentClassName="max-h-[calc(100dvh-5.5rem)] px-0 py-0"
         headerActions={
           <>
             {selectedArticle ? (
@@ -642,7 +650,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                   <div
                     role="button"
                     tabIndex={0}
-                    className="mx-auto w-full max-w-[34rem] rounded-2xl border border-border/70 bg-white/90 p-4 text-left transition hover:border-primary/30 hover:bg-white"
+                    className="mx-auto w-full max-w-[28rem] rounded-2xl border border-border/70 bg-white/90 p-4 text-left transition hover:border-primary/30 hover:bg-white"
                     onClick={() => setImagePickerOpen(true)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
@@ -666,20 +674,20 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                   </div>
                 </div>
 
-                <div className="grid gap-4 xl:grid-cols-2">
-                  <div className="space-y-2 xl:col-span-2">
+                <div className="grid gap-4 xl:grid-cols-12">
+                  <div className="space-y-2 xl:col-span-7">
                     <Label htmlFor="name">Artikelname</Label>
                     <Input id="name" placeholder="z. B. SFP Modul 10G Single-Mode" {...form.register("name")} />
                     <FieldError message={form.formState.errors.name?.message} />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 xl:col-span-5">
                     <Label htmlFor="barcode">Hauptbarcode</Label>
                     <Input id="barcode" placeholder="Standard-Barcode fuer diesen Artikel" {...form.register("barcode")} />
                     <FieldError message={form.formState.errors.barcode?.message} />
                   </div>
 
-                  <div className="space-y-2 xl:col-span-2">
+                  <div className="space-y-2 xl:col-span-7">
                     <Label htmlFor="additionalBarcodesInput">Weitere Barcodes</Label>
                     <Textarea
                       id="additionalBarcodesInput"
@@ -689,7 +697,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                     />
                   </div>
 
-                  <div className="space-y-2 xl:col-span-2">
+                  <div className="space-y-2 xl:col-span-3">
                     <Label htmlFor="category">Kategorie</Label>
                     <Input
                       id="category"
@@ -721,7 +729,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                     ) : null}
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 xl:col-span-2">
                     <Label htmlFor="sortOrder">Reihenfolge</Label>
                     <Input id="sortOrder" type="number" min={0} {...form.register("sortOrder")} />
                     <FieldError message={form.formState.errors.sortOrder?.message} />
@@ -732,7 +740,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
               <section className="space-y-4 rounded-2xl border border-border/70 bg-slate-50/80 p-5">
                 <h3 className="text-sm font-semibold text-slate-900">Lagerregeln</h3>
 
-                <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
+                <div className="grid gap-4 xl:grid-cols-[220px_320px]">
                   <div className="space-y-2">
                     <Label htmlFor="minimumStock">Mindestbestand</Label>
                     <Input id="minimumStock" type="number" min={0} {...form.register("minimumStock")} />
@@ -767,18 +775,28 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
               <section className="space-y-4 rounded-2xl border border-border/70 bg-slate-50/80 p-5">
                 <h3 className="text-sm font-semibold text-slate-900">Zusatzinformationen</h3>
 
-                <div className="grid gap-4 xl:grid-cols-3">
-                  <div className="space-y-2">
+                <div className="grid gap-4 xl:grid-cols-12">
+                  <div className="space-y-2 xl:col-span-3">
                     <Label htmlFor="manufacturerNumber">Hersteller-Nr.</Label>
                     <Input id="manufacturerNumber" placeholder="Optional" {...form.register("manufacturerNumber")} />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 xl:col-span-3">
                     <Label htmlFor="supplierNumber">Lieferanten-Nr.</Label>
                     <Input id="supplierNumber" placeholder="Optional" {...form.register("supplierNumber")} />
                   </div>
 
-                  <div className="space-y-2 xl:col-span-3">
+                  <div className="space-y-2 xl:col-span-2">
+                    <Label htmlFor="unitPriceInput">Preis (EUR)</Label>
+                    <Input
+                      id="unitPriceInput"
+                      inputMode="decimal"
+                      placeholder="z. B. 12,50"
+                      {...form.register("unitPriceInput")}
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-12">
                     <Label htmlFor="description">Beschreibung</Label>
                     <Textarea
                       id="description"

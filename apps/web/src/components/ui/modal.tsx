@@ -33,6 +33,20 @@ export function Modal({
       return;
     }
 
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyPaddingRight = body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - html.clientWidth;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         onClose();
@@ -43,6 +57,9 @@ export function Modal({
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      html.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyOverflow;
+      body.style.paddingRight = previousBodyPaddingRight;
     };
   }, [onClose, open]);
 
@@ -51,35 +68,34 @@ export function Modal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
-      onMouseDown={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className={cn(
-          "w-full max-w-3xl rounded-[1.75rem] border border-white/80 bg-white/95 shadow-2xl",
-          className
-        )}
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
-          <div className="space-y-1">
-            <h2 className="text-xl font-semibold text-slate-950">{title}</h2>
-            {description ? <p className="text-sm text-slate-500">{description}</p> : null}
+    <div className="fixed inset-0 z-[90] overflow-y-auto bg-slate-950/60 backdrop-blur-sm" onMouseDown={onClose}>
+      <div className="flex min-h-full items-start justify-center px-4 pb-4 pt-0 sm:px-5 sm:pb-5">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          className={cn(
+            "w-full max-w-3xl rounded-b-[1.75rem] border border-t-0 border-white/80 bg-white/95 shadow-2xl sm:rounded-[1.75rem] sm:border-t",
+            className
+          )}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+            <div className="space-y-1">
+              <h2 className="text-xl font-semibold text-slate-950">{title}</h2>
+              {description ? <p className="text-sm text-slate-500">{description}</p> : null}
+            </div>
+
+            <div className="flex items-start gap-2">
+              {headerActions}
+              <Button type="button" variant="ghost" className="h-10 w-10 p-0" onClick={onClose} aria-label="Modal schliessen">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
-          <div className="flex items-start gap-2">
-            {headerActions}
-            <Button type="button" variant="ghost" className="h-10 w-10 p-0" onClick={onClose} aria-label="Modal schliessen">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+          <div className={cn("max-h-[min(82vh,60rem)] overflow-auto px-6 py-5", contentClassName)}>{children}</div>
         </div>
-
-        <div className={cn("max-h-[min(82vh,60rem)] overflow-auto px-6 py-5", contentClassName)}>{children}</div>
       </div>
     </div>
   );

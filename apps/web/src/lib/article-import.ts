@@ -14,6 +14,7 @@ type ArticleImportColumn =
   | "description"
   | "manufacturerNumber"
   | "supplierNumber"
+  | "unitPrice"
   | "minimumStock"
   | "active"
   | "imageUrl";
@@ -29,6 +30,7 @@ const articleImportColumnAliases: Record<ArticleImportColumn, string[]> = {
   description: ["Beschreibung", "Description", "description"],
   manufacturerNumber: ["Herstellernummer", "Manufacturer Number", "manufacturerNumber"],
   supplierNumber: ["Lieferantennummer", "Supplier Number", "supplierNumber"],
+  unitPrice: ["Preis", "Preis EUR", "Unit Price", "Price", "unitPrice"],
   minimumStock: ["Mindestbestand", "Minimum Stock", "minimumStock"],
   active: ["Aktiv", "Active", "active"],
   imageUrl: ["Bild URL", "Image URL", "imageUrl"]
@@ -48,6 +50,7 @@ const articleImportRowSchema = z.object({
   description: z.string().max(500).optional(),
   manufacturerNumber: z.string().max(120).optional(),
   supplierNumber: z.string().max(120).optional(),
+  unitPriceCents: z.number().int().min(0).max(999999999).optional(),
   minimumStock: z.number().int().min(0).max(999999).optional(),
   active: z.boolean().optional(),
   imageUrl: z.string().max(500).optional()
@@ -99,6 +102,31 @@ function parseIntegerCell(value: string, rowNumber: number, label: string) {
   }
 
   return parsed;
+}
+
+function parsePriceCell(value: string, rowNumber: number, label: string) {
+  if (!value) {
+    return undefined;
+  }
+
+  let normalized = value.trim().replace(/\s+/g, "").replace(/[€]/g, "");
+
+  if (normalized.includes(",") && normalized.includes(".")) {
+    if (normalized.lastIndexOf(",") > normalized.lastIndexOf(".")) {
+      normalized = normalized.replace(/\./g, "").replace(",", ".");
+    } else {
+      normalized = normalized.replace(/,/g, "");
+    }
+  } else {
+    normalized = normalized.replace(",", ".");
+  }
+
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`Zeile ${rowNumber}: ${label} muss eine Zahl ab 0 sein.`);
+  }
+
+  return Math.round(parsed * 100);
 }
 
 function parseBooleanCell(value: string, rowNumber: number) {
@@ -239,6 +267,9 @@ export async function parseArticleImportFile(file: File): Promise<ParsedArticleI
         ? getColumnValue(normalizedRow, "manufacturerNumber")
         : undefined,
       supplierNumber: presentColumns.has("supplierNumber") ? getColumnValue(normalizedRow, "supplierNumber") : undefined,
+      unitPriceCents: presentColumns.has("unitPrice")
+        ? parsePriceCell(getColumnValue(normalizedRow, "unitPrice"), rowNumber, "Preis")
+        : undefined,
       minimumStock: presentColumns.has("minimumStock")
         ? parseIntegerCell(getColumnValue(normalizedRow, "minimumStock"), rowNumber, "Mindestbestand")
         : undefined,

@@ -6,6 +6,7 @@ import { OrderDetailActions } from "@/features/orders/order-detail-actions";
 import { OrderStatusBadge } from "@/features/orders/order-status-badge";
 import { articlePlaceholderImage } from "@/lib/article-images";
 import { withBasePath } from "@/lib/base-path";
+import { formatCurrency } from "@/lib/currency";
 import { requireUser } from "@/server/auth";
 import { formatDateTime, formatQuantity } from "@/server/format";
 import { getPurchaseOrderForUser } from "@/server/order-documents";
@@ -22,6 +23,12 @@ export default async function OrderDetailPage({ params }: PageProps) {
   if (!order) {
     notFound();
   }
+
+  const totalOrderAmountCents = order.items.reduce(
+    (sum, item) => sum + (item.unitPriceCentsSnapshot ?? 0) * item.quantity,
+    0
+  );
+  const itemsWithoutPrice = order.items.filter((item) => item.unitPriceCentsSnapshot === null).length;
 
   return (
     <div className="space-y-8">
@@ -73,6 +80,14 @@ export default async function OrderDetailPage({ params }: PageProps) {
             <p>
               <strong>Positionen:</strong> {formatQuantity(order.items.length)}
             </p>
+            <p>
+              <strong>Gesamtsumme:</strong> {formatCurrency(totalOrderAmountCents, "0,00 EUR")}
+            </p>
+            {itemsWithoutPrice ? (
+              <p>
+                <strong>Ohne Preis:</strong> {formatQuantity(itemsWithoutPrice)} Positionen
+              </p>
+            ) : null}
             <div className="rounded-2xl bg-secondary/60 px-4 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Notiz</p>
               <p className="mt-2 text-sm text-slate-700">{order.note || "Keine zusaetzliche Notiz hinterlegt."}</p>
@@ -123,6 +138,23 @@ export default async function OrderDetailPage({ params }: PageProps) {
                       <div className="rounded-xl bg-white px-3 py-3">
                         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Mindestbestand</p>
                         <p className="mt-1 text-lg font-semibold text-slate-950">{formatQuantity(item.minimumStockSnapshot)}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl bg-white px-3 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Einzelpreis</p>
+                        <p className="mt-1 text-lg font-semibold text-slate-950">
+                          {formatCurrency(item.unitPriceCentsSnapshot, "Kein Preis")}
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-white px-3 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Positionssumme</p>
+                        <p className="mt-1 text-lg font-semibold text-slate-950">
+                          {item.unitPriceCentsSnapshot !== null
+                            ? formatCurrency(item.unitPriceCentsSnapshot * item.quantity, "0,00 EUR")
+                            : "Nicht verfuegbar"}
+                        </p>
                       </div>
                     </div>
                   </article>

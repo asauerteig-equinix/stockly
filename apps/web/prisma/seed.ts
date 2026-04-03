@@ -133,6 +133,7 @@ async function main() {
         description: "Single-Mode SFP+ Modul fuer Core-Switche.",
         manufacturerNumber: "SFP-10G-SM",
         supplierNumber: "SUP-001",
+        unitPriceCents: 2890,
         category: "Optik",
         sortOrder: 1,
         minimumStock: 5
@@ -144,6 +145,7 @@ async function main() {
         description: "Glasfaser-Patchkabel fuer Feld- und Rackeinsatz.",
         manufacturerNumber: "LC5M",
         supplierNumber: "SUP-010",
+        unitPriceCents: 1250,
         category: "Kabel",
         sortOrder: 1,
         minimumStock: 12
@@ -155,6 +157,7 @@ async function main() {
         description: "Managed Access-Switch fuer Projekte und Reservegeraete.",
         manufacturerNumber: "SW24-MG",
         supplierNumber: "SUP-122",
+        unitPriceCents: 28900,
         category: "Hardware",
         sortOrder: 1,
         minimumStock: 2
@@ -166,6 +169,7 @@ async function main() {
         description: "Rack-Zubehoer ohne Buchungsbewegung fuer Testdaten.",
         manufacturerNumber: "RACK-1HE",
         supplierNumber: "SUP-051",
+        unitPriceCents: 1490,
         category: "Rack",
         sortOrder: 1,
         minimumStock: 1
@@ -177,6 +181,7 @@ async function main() {
         description: "Reservegeraet fuer Standort Hamburg.",
         manufacturerNumber: "MC-1G",
         supplierNumber: "SUP-221",
+        unitPriceCents: 6900,
         category: "Hardware",
         sortOrder: 1,
         minimumStock: 3

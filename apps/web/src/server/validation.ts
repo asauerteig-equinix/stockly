@@ -26,6 +26,7 @@ export const articleSchema = z.object({
   description: z.string().max(500).optional().nullable(),
   manufacturerNumber: z.string().max(120).optional().nullable(),
   supplierNumber: z.string().max(120).optional().nullable(),
+  unitPriceCents: z.coerce.number().int().min(0).optional().nullable(),
   category: z.string().min(2),
   sortOrder: z.coerce.number().int().min(0).default(0),
   minimumStock: z.coerce.number().int().min(0),
