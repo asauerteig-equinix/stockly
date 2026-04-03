@@ -391,19 +391,6 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
     });
   }
 
-  function renderStepPill(label: string, active: boolean) {
-    return (
-      <span
-        className={cn(
-          "rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.18em]",
-          active ? "border-cyan-300/30 bg-cyan-400/12 text-cyan-100" : "border-white/10 bg-white/5 text-slate-400"
-        )}
-      >
-        {label}
-      </span>
-    );
-  }
-
   return (
     <div className="relative flex h-full min-h-0 flex-col gap-3 overflow-hidden" onPointerDownCapture={handleInteractionCapture}>
       <section className="flex items-center justify-between gap-3 rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-3 text-white">
@@ -415,31 +402,38 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
           <Badge variant="success">Kiosk aktiv</Badge>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-2 lg:flex">
-            {renderStepPill("Kategorie", step === "categories")}
-            {renderStepPill("Artikel", step === "articles")}
-            {renderStepPill("Buchung", step === "booking" || step === "success")}
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 w-11 border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
-            onClick={() => setServicePanelOpen((currentValue) => !currentValue)}
-            aria-label="Service-Menue"
-          >
-            {servicePanelOpen ? <X className="h-4 w-4" /> : <Settings2 className="h-4 w-4" />}
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 w-11 border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
+          onClick={() => setServicePanelOpen((currentValue) => !currentValue)}
+          aria-label="Service-Menue"
+        >
+          {servicePanelOpen ? <X className="h-4 w-4" /> : <Settings2 className="h-4 w-4" />}
+        </Button>
       </section>
 
       {servicePanelOpen ? (
-        <div className="absolute right-0 top-16 z-20 w-full max-w-sm">
-          <Card className="border-white/10 bg-slate-950/96 text-white shadow-2xl">
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+          onClick={() => setServicePanelOpen(false)}
+        >
+          <Card className="w-full max-w-sm border-white/10 bg-slate-950/96 text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <CardContent className="space-y-4 p-5">
-              <div className="flex items-center gap-2">
-                <RotateCcw className="h-4 w-4 text-slate-300" />
-                <p className="font-medium text-white">Neukopplung</p>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <RotateCcw className="h-4 w-4 text-slate-300" />
+                  <p className="font-medium text-white">Neukopplung</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 w-10 border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
+                  onClick={() => setServicePanelOpen(false)}
+                  aria-label="Modal schliessen"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
               <PinPad label="Reset-PIN" value={resetPin} onChange={setResetPin} maxLength={20} />
               <Button
@@ -508,7 +502,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                       type="button"
                       onClick={() => openCategory(category)}
                       className={cn(
-                        "min-h-[8.5rem] rounded-[1.5rem] border px-4 py-4 text-left transition",
+                        "min-h-[clamp(6.75rem,13vh,8.5rem)] rounded-[1.5rem] border px-4 py-4 text-left transition",
                         selectedCategory === category
                           ? "border-cyan-400/35 bg-cyan-400/10"
                           : "border-white/10 bg-slate-950/80 hover:border-cyan-400/30 hover:bg-slate-900"
@@ -566,7 +560,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                     type="button"
                     onClick={() => openArticle(article)}
                     className={cn(
-                      "min-h-[8rem] rounded-[1.5rem] border px-4 py-4 text-left transition",
+                      "min-h-[clamp(6.5rem,12vh,8rem)] rounded-[1.5rem] border px-4 py-4 text-left transition",
                       bookingSuccess?.articleId === article.id
                         ? "border-emerald-300/35 bg-emerald-400/10"
                         : "border-white/10 bg-slate-900/80 hover:border-cyan-400/30 hover:bg-slate-900"
@@ -637,7 +631,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
 
                 <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <h2 className="text-3xl font-semibold text-white">{selectedArticle.name}</h2>
+                    <h2 className="text-[clamp(1.75rem,4vh,2.4rem)] font-semibold text-white">{selectedArticle.name}</h2>
                     <p className="mt-2 text-sm text-slate-300">{selectedArticle.barcode}</p>
                   </div>
 
@@ -658,29 +652,56 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                 {bookingError ? <FormFeedback message={bookingError} tone="error" /> : null}
 
                 <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/60 p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="mb-4 flex items-center justify-between gap-3">
                     <p className="text-sm font-medium text-white">Menge</p>
                     <Badge variant="muted" className="bg-white/10 text-slate-200">
                       {formatQuantity(quantity)}
                     </Badge>
                   </div>
-                  <div className="grid grid-cols-[72px_minmax(0,1fr)_72px] gap-3">
-                    <Button type="button" size="lg" variant="outline" className="h-16 border-white/10 bg-white/5 text-3xl text-white" onClick={() => adjustQuantity(-1)}>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <Button
+                      type="button"
+                      size="lg"
+                      variant="outline"
+                      className="h-[clamp(4.5rem,10vh,5.5rem)] rounded-[1.5rem] border-white/10 bg-white/5 text-[clamp(2rem,5vh,2.75rem)] text-white hover:bg-white/10"
+                      onClick={() => adjustQuantity(-1)}
+                    >
                       -
                     </Button>
-                    <div className="flex h-16 items-center justify-center rounded-2xl border border-white/10 bg-slate-900/80 text-3xl font-semibold text-white">
+                    <div className="flex h-[clamp(4.5rem,10vh,5.5rem)] items-center justify-center rounded-[1.5rem] border border-cyan-400/20 bg-cyan-400/10 text-[clamp(2rem,5vh,2.75rem)] font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
                       {formatQuantity(quantity)}
                     </div>
-                    <Button type="button" size="lg" variant="outline" className="h-16 border-white/10 bg-white/5 text-3xl text-white" onClick={() => adjustQuantity(1)}>
+                    <Button
+                      type="button"
+                      size="lg"
+                      variant="outline"
+                      className="h-[clamp(4.5rem,10vh,5.5rem)] rounded-[1.5rem] border-white/10 bg-white/5 text-[clamp(2rem,5vh,2.75rem)] text-white hover:bg-white/10"
+                      onClick={() => adjustQuantity(1)}
+                    >
                       +
                     </Button>
                   </div>
-                  <div className="mt-3 grid grid-cols-4 gap-2">
+
+                  <div className="mt-4">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-400">Schnellmengen</p>
+                    <div className="grid grid-cols-4 gap-2">
                     {[1, 2, 5, 10].map((preset) => (
-                      <Button key={preset} type="button" variant="outline" className="h-12 border-white/10 bg-white/5 text-white" onClick={() => setQuantity(preset)}>
-                        {preset}
-                      </Button>
-                    ))}
+                        <Button
+                          key={preset}
+                          type="button"
+                          variant={quantity === preset ? "secondary" : "outline"}
+                          className={
+                            quantity === preset
+                              ? "h-14 rounded-2xl text-base"
+                              : "h-14 rounded-2xl border-white/10 bg-white/5 text-base text-white hover:bg-white/10"
+                          }
+                          onClick={() => setQuantity(preset)}
+                        >
+                          {preset}x
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
