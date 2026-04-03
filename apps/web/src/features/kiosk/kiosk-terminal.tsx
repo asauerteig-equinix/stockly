@@ -1,16 +1,16 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { Camera, ChevronDown, RotateCcw, ScanLine, Settings2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Camera, RotateCcw, ScanLine, Settings2, TriangleAlert, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormFeedback } from "@/components/ui/form-feedback";
 import { normalizeBarcode } from "@/lib/barcodes";
-import { fetchJson } from "@/lib/fetch-json";
 import { cn } from "@/lib/cn";
+import { fetchJson } from "@/lib/fetch-json";
 import { formatQuantity } from "@/server/format";
 
 import { BarcodeScanner } from "./barcode-scanner";
@@ -39,19 +39,122 @@ type KioskTerminalProps = {
   popularArticleIds: string[];
 };
 
+const PATCH_PATTERNS = [/\bpatch\b/i, /\bpatchkabel\b/i, /\blc[-/ ]?lc\b/i, /\bsc[-/ ]?sc\b/i, /\bcat\d/i];
+
 function isAttention(article: ArticleResult) {
   return article.quantity <= article.minimumStock;
+}
+
+function normalizeCategory(category: string) {
+  const value = category.trim();
+  return value || "Sonstiges";
+}
+
+function createPopularityRank(articleIds: string[]) {
+  return new Map(articleIds.map((articleId, index) => [articleId, index]));
+}
+
+function matchesPatchFocus(value: string) {
+  return PATCH_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+function isPatchFocusedArticle(article: ArticleResult) {
+  const category = normalizeCategory(article.category);
+
+  if (category.toLowerCase() === "kabel") {
+    return true;
+  }
+
+  return matchesPatchFocus(`${article.name} ${category} ${article.description ?? ""}`);
+}
+
+function isPatchFocusedCategory(category: string, categoryArticles: ArticleResult[]) {
+  const normalizedCategory = normalizeCategory(category);
+
+  if (normalizedCategory.toLowerCase() === "kabel" || matchesPatchFocus(normalizedCategory)) {
+    return true;
+  }
+
+  return categoryArticles.some(isPatchFocusedArticle);
+}
+
+function compareText(left: string, right: string) {
+  return left.localeCompare(right, "de", { sensitivity: "base" });
+}
+
+function compareArticles(left: ArticleResult, right: ArticleResult, popularityRank: Map<string, number>) {
+  const leftPatch = isPatchFocusedArticle(left);
+  const rightPatch = isPatchFocusedArticle(right);
+
+  if (leftPatch !== rightPatch) {
+    return leftPatch ? -1 : 1;
+  }
+
+  const leftRank = popularityRank.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+  const rightRank = popularityRank.get(right.id) ?? Number.MAX_SAFE_INTEGER;
+
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
+
+  return compareText(left.name, right.name);
+}
+
+function resolveInitialArticleId(articles: ArticleResult[], popularArticleIds: string[]) {
+  if (!articles.length) {
+    return null;
+  }
+
+  const popularityRank = createPopularityRank(popularArticleIds);
+  return [...articles].sort((left, right) => compareArticles(left, right, popularityRank))[0]?.id ?? null;
+}
+
+function groupArticlesByCategory(articles: ArticleResult[]) {
+  const groups = new Map<string, ArticleResult[]>();
+
+  articles.forEach((article) => {
+    const category = normalizeCategory(article.category);
+    const currentGroup = groups.get(category);
+
+    if (currentGroup) {
+      currentGroup.push(article);
+      return;
+    }
+
+    groups.set(category, [article]);
+  });
+
+  return Array.from(groups.entries()).sort(([leftCategory, leftArticles], [rightCategory, rightArticles]) => {
+    const leftPatch = isPatchFocusedCategory(leftCategory, leftArticles);
+    const rightPatch = isPatchFocusedCategory(rightCategory, rightArticles);
+
+    if (leftPatch !== rightPatch) {
+      return leftPatch ? -1 : 1;
+    }
+
+    return compareText(leftCategory, rightCategory);
+  });
+}
+
+function resolveInitialCategory(articles: ArticleResult[], popularArticleIds: string[]) {
+  const popularityRank = createPopularityRank(popularArticleIds);
+  const orderedArticles = [...articles].sort((left, right) => compareArticles(left, right, popularityRank));
+  return groupArticlesByCategory(orderedArticles)[0]?.[0] ?? null;
 }
 
 export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds }: KioskTerminalProps) {
   const router = useRouter();
   const [catalogue, setCatalogue] = useState<ArticleResult[]>(articles);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedArticleId, setSelectedArticleId] = useState<string | null>(popularArticleIds[0] ?? articles[0]?.id ?? null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(() =>
+    resolveInitialCategory(articles, popularArticleIds)
+  );
+  const [selectedArticleId, setSelectedArticleId] = useState<string | null>(() =>
+    resolveInitialArticleId(articles, popularArticleIds)
+  );
   const [quantity, setQuantity] = useState(1);
   const [usageReason, setUsageReason] = useState(usageReasons[0] ?? "project");
   const [resetPin, setResetPin] = useState("");
-  const [scannerOpen, setScannerOpen] = useState(true);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [servicePanelOpen, setServicePanelOpen] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string | null }>({
     tone: "success",
@@ -59,31 +162,67 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
   });
   const [isPending, startTransition] = useTransition();
 
-  const categoryOptions = useMemo(
-    () => Array.from(new Set(catalogue.map((article) => article.category.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
-    [catalogue]
+  const popularityRank = useMemo(() => createPopularityRank(popularArticleIds), [popularArticleIds]);
+
+  const orderedArticles = useMemo(
+    () => [...catalogue].sort((left, right) => compareArticles(left, right, popularityRank)),
+    [catalogue, popularityRank]
   );
+
+  const groupedArticles = useMemo(() => groupArticlesByCategory(orderedArticles), [orderedArticles]);
+
+  const filteredArticles = useMemo(() => {
+    if (!selectedCategory) {
+      return [];
+    }
+
+    return groupedArticles.find(([category]) => category === selectedCategory)?.[1] ?? [];
+  }, [groupedArticles, selectedCategory]);
 
   const selectedArticle = useMemo(
     () => catalogue.find((article) => article.id === selectedArticleId) ?? null,
     [catalogue, selectedArticleId]
   );
 
-  const featuredArticles = useMemo(() => {
-    const resolved = popularArticleIds
-      .map((articleId) => catalogue.find((article) => article.id === articleId) ?? null)
-      .filter((article): article is ArticleResult => Boolean(article));
+  const patchFocusedCount = useMemo(
+    () => orderedArticles.filter((article) => isPatchFocusedArticle(article)).length,
+    [orderedArticles]
+  );
 
-    return resolved.length ? resolved.slice(0, 8) : catalogue.slice(0, 8);
-  }, [catalogue, popularArticleIds]);
-
-  const filteredArticles = useMemo(() => {
-    if (selectedCategory === "all") {
-      return catalogue;
+  useEffect(() => {
+    if (!groupedArticles.length) {
+      if (selectedCategory !== null) {
+        setSelectedCategory(null);
+      }
+      if (selectedArticleId !== null) {
+        setSelectedArticleId(null);
+      }
+      return;
     }
 
-    return catalogue.filter((article) => article.category === selectedCategory);
-  }, [catalogue, selectedCategory]);
+    const activeCategory =
+      selectedCategory && groupedArticles.some(([category]) => category === selectedCategory)
+        ? selectedCategory
+        : groupedArticles[0][0];
+
+    if (activeCategory !== selectedCategory) {
+      setSelectedCategory(activeCategory);
+      return;
+    }
+
+    const visibleArticles = groupedArticles.find(([category]) => category === activeCategory)?.[1] ?? [];
+
+    if (!visibleArticles.length) {
+      if (selectedArticleId !== null) {
+        setSelectedArticleId(null);
+      }
+      return;
+    }
+
+    if (!selectedArticleId || !visibleArticles.some((article) => article.id === selectedArticleId)) {
+      setSelectedArticleId(visibleArticles[0].id);
+    }
+  }, [groupedArticles, selectedArticleId, selectedCategory]);
 
   function selectArticle(articleId: string) {
     setSelectedArticleId(articleId);
@@ -94,25 +233,28 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
   }
 
   function selectByBarcode(detectedBarcode: string) {
-    const normalizedBarcode = normalizeBarcode(detectedBarcode);
+    const normalizedDetectedBarcode = normalizeBarcode(detectedBarcode);
     const resolvedArticle = catalogue.find(
       (article) =>
-        normalizeBarcode(article.barcode) === normalizedBarcode ||
-        article.additionalBarcodes.some((barcode) => normalizeBarcode(barcode) === normalizedBarcode)
+        normalizeBarcode(article.barcode) === normalizedDetectedBarcode ||
+        article.additionalBarcodes.some((barcode) => normalizeBarcode(barcode) === normalizedDetectedBarcode)
     );
 
     if (!resolvedArticle) {
       setFeedback({
         tone: "error",
-        message: `Barcode ${normalizedBarcode} erkannt, aber keinem Artikel am Standort zugeordnet.`
+        message: `Barcode ${normalizedDetectedBarcode} erkannt, aber keinem Artikel am Standort zugeordnet.`
       });
       return false;
     }
 
-    setSelectedCategory(resolvedArticle.category);
+    setSelectedCategory(normalizeCategory(resolvedArticle.category));
     setSelectedArticleId(resolvedArticle.id);
     setQuantity(1);
-    setFeedback({ tone: "success", message: `Barcode ${normalizedBarcode} erkannt. Artikel wurde uebernommen.` });
+    setFeedback({
+      tone: "success",
+      message: `Barcode ${normalizedDetectedBarcode} erkannt. Artikel wurde uebernommen.`
+    });
     return true;
   }
 
@@ -184,33 +326,22 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
           <Badge variant="success">Kiosk aktiv</Badge>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="border-white/10 bg-white/5 text-white hover:bg-white/10"
-            onClick={() => setScannerOpen((currentValue) => !currentValue)}
-          >
-            <Camera className="mr-2 h-4 w-4" />
-            {scannerOpen ? "Scanner ausblenden" : "Scanner anzeigen"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 w-11 border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
-            onClick={() => setServicePanelOpen((currentValue) => !currentValue)}
-            aria-label="Service-Menue"
-          >
-            {servicePanelOpen ? <X className="h-4 w-4" /> : <Settings2 className="h-4 w-4" />}
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 w-11 border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
+          onClick={() => setServicePanelOpen((currentValue) => !currentValue)}
+          aria-label="Service-Menue"
+        >
+          {servicePanelOpen ? <X className="h-4 w-4" /> : <Settings2 className="h-4 w-4" />}
+        </Button>
       </div>
 
       {feedback.message ? <FormFeedback message={feedback.message} tone={feedback.tone} /> : null}
 
       {servicePanelOpen ? (
         <Card className="ml-auto max-w-md border-white/10 bg-slate-950/88 text-white">
-          <CardHeader className="gap-2">
+          <CardHeader className="gap-2 border-white/10">
             <div className="flex items-center gap-2">
               <RotateCcw className="h-4 w-4 text-slate-300" />
               <CardTitle className="text-base">Service / Neukopplung</CardTitle>
@@ -235,157 +366,208 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_420px]">
         <div className="space-y-5">
-          {scannerOpen ? (
-            <Card className="border-white/10 bg-slate-950/82 text-white">
-              <CardHeader className="gap-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-lg">Scanner</CardTitle>
-                    <CardDescription className="text-slate-400">
-                      Scannen, Ton bestaetigt das Ergebnis, danach direkt weiterbuchen.
-                    </CardDescription>
-                  </div>
-                  <Badge variant="muted" className="bg-white/10 text-slate-200">
-                    Dauerbetrieb
-                  </Badge>
+          <Card className="overflow-hidden border-white/10 bg-slate-950/82 text-white">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-white/[0.03]"
+              onClick={() => setScannerOpen((currentValue) => !currentValue)}
+              aria-expanded={scannerOpen}
+              aria-controls="kiosk-scanner-panel"
+            >
+              <div className="flex min-w-0 items-start gap-3">
+                <div
+                  className={cn(
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border",
+                    scannerOpen
+                      ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-200"
+                      : "border-white/10 bg-white/5 text-slate-200"
+                  )}
+                >
+                  <Camera className="h-5 w-5" />
                 </div>
-              </CardHeader>
-              <CardContent>
+                <div>
+                  <p className="text-lg font-semibold text-white">Scanner</p>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Standardmaessig geschlossen. Nur bei Bedarf oeffnen, damit die manuelle Buchung im Fokus bleibt.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-3">
+                <Badge
+                  variant="muted"
+                  className={cn(
+                    "bg-white/10",
+                    scannerOpen ? "text-cyan-100" : "text-slate-200"
+                  )}
+                >
+                  {scannerOpen ? "Offen" : "Geschlossen"}
+                </Badge>
+                <ChevronDown
+                  className={cn("h-5 w-5 text-slate-400 transition-transform", scannerOpen ? "rotate-180" : "")}
+                />
+              </div>
+            </button>
+
+            {scannerOpen ? (
+              <div id="kiosk-scanner-panel" className="border-t border-white/10 p-5">
                 <BarcodeScanner onDetected={selectByBarcode} />
-              </CardContent>
-            </Card>
-          ) : null}
+              </div>
+            ) : null}
+          </Card>
 
           <Card className="border-white/10 bg-slate-950/82 text-white">
-            <CardHeader className="gap-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardHeader className="gap-4 border-white/10">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <CardTitle className="text-lg">Artikel</CardTitle>
+                  <CardTitle className="text-lg">Artikel nach Kategorien</CardTitle>
                   <CardDescription className="text-slate-400">
-                    Antippen oder scannen und rechts direkt buchen.
+                    Kategorien antippen, danach erscheint direkt die passende Artikelliste. Patchkabel starten zuerst.
                   </CardDescription>
                 </div>
-                <Badge variant="muted" className="bg-white/10 text-slate-200">
-                  {formatQuantity(filteredArticles.length)} sichtbar
-                </Badge>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="muted" className="bg-white/10 text-slate-200">
+                    {formatQuantity(filteredArticles.length)} Artikel
+                  </Badge>
+                  <Badge className="border border-white/10 bg-white/5 text-slate-100">
+                    {formatQuantity(groupedArticles.length)} Kategorien
+                  </Badge>
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={selectedCategory === "all" ? "default" : "outline"}
-                  className={selectedCategory === "all" ? "" : "border-white/10 bg-slate-950/70 text-white hover:bg-white/5"}
-                  onClick={() => setSelectedCategory("all")}
-                >
-                  Alle
-                </Button>
-                {categoryOptions.map((category) => (
-                  <Button
-                    key={category}
-                    type="button"
-                    size="sm"
-                    variant={selectedCategory === category ? "default" : "outline"}
-                    className={
-                      selectedCategory === category ? "" : "border-white/10 bg-slate-950/70 text-white hover:bg-white/5"
-                    }
-                    onClick={() => setSelectedCategory(category)}
-                  >
-                    {category}
-                  </Button>
-                ))}
+                {groupedArticles.map(([category, categoryArticles]) => {
+                  const patchCategory = isPatchFocusedCategory(category, categoryArticles);
+
+                  return (
+                    <Button
+                      key={category}
+                      type="button"
+                      size="sm"
+                      variant={selectedCategory === category ? "default" : "outline"}
+                      className={
+                        selectedCategory === category
+                          ? "gap-2"
+                          : cn(
+                              "gap-2 border-white/10 bg-slate-950/70 text-white hover:bg-white/5",
+                              patchCategory ? "border-cyan-400/25 text-cyan-100" : ""
+                            )
+                      }
+                      onClick={() => setSelectedCategory(category)}
+                    >
+                      <span>{category}</span>
+                      <span className="text-[11px] uppercase tracking-[0.12em] opacity-80">
+                        {formatQuantity(categoryArticles.length)}
+                      </span>
+                    </Button>
+                  );
+                })}
+                {patchFocusedCount ? (
+                  <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                    {formatQuantity(patchFocusedCount)} Patchkabel im Fokus
+                  </Badge>
+                ) : null}
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-5">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-white">Schnellwahl</p>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Zuletzt genutzt</p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {featuredArticles.map((article) => (
-                    <button
-                      key={article.id}
-                      type="button"
-                      onClick={() => selectArticle(article.id)}
-                      className={cn(
-                        "rounded-2xl border px-4 py-4 text-left transition",
-                        selectedArticle?.id === article.id
-                          ? "border-cyan-400/40 bg-cyan-400/12"
-                          : "border-white/10 bg-slate-900/80 hover:border-cyan-400/30 hover:bg-slate-900"
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-white">{article.name}</p>
-                          <p className="mt-1 text-sm text-slate-400">{article.category}</p>
-                        </div>
-                        {isAttention(article) ? <TriangleAlert className="h-4 w-4 text-amber-300" /> : null}
-                      </div>
-                      <p className="mt-4 text-sm text-slate-300">Bestand {formatQuantity(article.quantity)}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <CardContent className="space-y-4">
+              {groupedArticles.length ? (
+                <section
+                  className={cn(
+                    "rounded-3xl border p-4",
+                    selectedCategory && isPatchFocusedCategory(selectedCategory, filteredArticles)
+                      ? "border-cyan-400/20 bg-gradient-to-br from-cyan-400/10 via-slate-950/70 to-slate-950/95"
+                      : "border-white/10 bg-slate-900/55"
+                  )}
+                >
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-white">
+                        {selectedCategory ?? "Keine Kategorie"}
+                      </h3>
+                      {selectedCategory && isPatchFocusedCategory(selectedCategory, filteredArticles) ? (
+                        <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                          Patchkabel Fokus
+                        </Badge>
+                      ) : null}
+                    </div>
 
-              <div className="grid max-h-[40rem] gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
-                {filteredArticles.map((article) => (
-                  <button
-                    key={article.id}
-                    type="button"
-                    onClick={() => selectArticle(article.id)}
-                    className={cn(
-                      "rounded-2xl border px-4 py-4 text-left transition",
-                      selectedArticle?.id === article.id
-                        ? "border-cyan-400/40 bg-cyan-400/12"
-                        : "border-white/10 bg-slate-900/80 hover:border-cyan-400/30 hover:bg-slate-900"
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-white">{article.name}</p>
-                        <p className="mt-1 text-sm text-slate-400">{article.category}</p>
-                        <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{article.barcode}</p>
-                        {article.additionalBarcodes.length ? (
-                          <p className="mt-1 text-[11px] uppercase tracking-[0.14em] text-slate-500">
-                            + {article.additionalBarcodes.length} weitere
-                          </p>
-                        ) : null}
-                      </div>
-                      {isAttention(article) ? <Badge variant="warning">Niedrig</Badge> : <Badge variant="success">OK</Badge>}
-                    </div>
-                    <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-300">
-                      <span>Bestand {formatQuantity(article.quantity)}</span>
-                      <span>Min. {formatQuantity(article.minimumStock)}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                      {formatQuantity(filteredArticles.length)} Artikel
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {filteredArticles.map((article) => (
+                      <button
+                        key={article.id}
+                        type="button"
+                        onClick={() => selectArticle(article.id)}
+                        className={cn(
+                          "rounded-2xl border px-4 py-4 text-left transition",
+                          selectedArticle?.id === article.id
+                            ? "border-cyan-400/40 bg-cyan-400/12"
+                            : selectedCategory && isPatchFocusedCategory(selectedCategory, filteredArticles)
+                              ? "border-cyan-400/15 bg-slate-950/85 hover:border-cyan-400/35 hover:bg-slate-950"
+                              : "border-white/10 bg-slate-950/80 hover:border-cyan-400/30 hover:bg-slate-900"
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-white">{article.name}</p>
+                            <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{article.barcode}</p>
+                          </div>
+                          {isAttention(article) ? <Badge variant="warning">Niedrig</Badge> : <Badge variant="success">OK</Badge>}
+                        </div>
+
+                        {article.description ? <p className="mt-3 text-sm text-slate-300">{article.description}</p> : null}
+
+                        <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-300">
+                          <span>Bestand {formatQuantity(article.quantity)}</span>
+                          <span>Min. {formatQuantity(article.minimumStock)}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : (
+                <div className="rounded-3xl border border-dashed border-white/15 bg-slate-900/50 p-8 text-center">
+                  <p className="text-base font-medium text-white">Keine Kategorien vorhanden.</p>
+                  <p className="mt-2 text-sm text-slate-400">
+                    Sobald Artikel Kategorien haben, wird hier die passende Artikelliste angezeigt.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
         <Card className="border-white/10 bg-slate-950/88 text-white xl:sticky xl:top-4">
-          <CardHeader className="gap-3">
+          <CardHeader className="gap-3 border-white/10">
             <div className="flex items-center gap-2">
               <ScanLine className="h-4 w-4 text-cyan-200" />
               <CardTitle>Buchung</CardTitle>
             </div>
             <CardDescription className="text-slate-400">
-              Artikel waehlen, Menge festlegen, direkt buchen.
+              Artikel waehlen, Menge festlegen und direkt buchen.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {selectedArticle ? (
               <div className="rounded-3xl border border-cyan-500/20 bg-cyan-500/10 p-5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">{selectedArticle.category}</Badge>
+                  <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+                    {normalizeCategory(selectedArticle.category)}
+                  </Badge>
+                  {isPatchFocusedArticle(selectedArticle) ? (
+                    <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">Patchkabel Fokus</Badge>
+                  ) : null}
                   {isAttention(selectedArticle) ? <Badge variant="warning">Unter Minimum</Badge> : <Badge variant="success">Im Rahmen</Badge>}
                 </div>
                 <h2 className="mt-3 text-2xl font-semibold text-white">{selectedArticle.name}</h2>
                 {selectedArticle.description ? <p className="mt-2 text-sm text-slate-300">{selectedArticle.description}</p> : null}
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-2xl bg-slate-900/70 p-4">
                     <p className="text-sm text-slate-400">Bestand</p>
                     <p className="mt-1 text-3xl font-semibold text-white">{formatQuantity(selectedArticle.quantity)}</p>
@@ -394,11 +576,20 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                     <p className="text-sm text-slate-400">Mindestbestand</p>
                     <p className="mt-1 text-3xl font-semibold text-white">{formatQuantity(selectedArticle.minimumStock)}</p>
                   </div>
+                  <div className="rounded-2xl bg-slate-900/70 p-4">
+                    <p className="text-sm text-slate-400">Barcode</p>
+                    <p className="mt-1 break-all text-sm font-medium text-white">{selectedArticle.barcode}</p>
+                    {selectedArticle.additionalBarcodes.length ? (
+                      <p className="mt-2 text-xs text-slate-400">
+                        + {formatQuantity(selectedArticle.additionalBarcodes.length)} weitere Scan-Codes
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             ) : (
               <div className="rounded-3xl border border-dashed border-white/15 bg-slate-900/50 p-8 text-center text-slate-400">
-                Links scannen oder einen Artikel antippen, um die Buchung zu starten.
+                Artikel aus der kategorisierten Liste waehlen oder bei Bedarf den Scanner oeffnen.
               </div>
             )}
 
@@ -460,7 +651,11 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                     key={reason}
                     type="button"
                     variant={usageReason === reason ? "default" : "outline"}
-                    className={usageReason === reason ? "justify-start" : "justify-start border-white/10 bg-slate-950/70 text-white hover:bg-white/5"}
+                    className={
+                      usageReason === reason
+                        ? "justify-start"
+                        : "justify-start border-white/10 bg-slate-950/70 text-white hover:bg-white/5"
+                    }
                     onClick={() => setUsageReason(reason)}
                   >
                     {reason}
