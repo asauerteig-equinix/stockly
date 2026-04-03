@@ -46,6 +46,25 @@ Der Stack in `docker-compose.yml` ist jetzt auf Portainer-Betrieb ausgelegt:
 - keine Source-Mounts
 - automatisches `prisma migrate deploy` beim Start
 - optionales Auto-Seeding bei leerer Datenbank
+- weiterhin direkt aus dem Git-Repository buildbar, ohne vorgebautes Image
+
+### Build-Zeit auf dem Portainer-Geraet
+
+Die Web-App wird bewusst weiter direkt auf dem Zielgeraet aus dem GitHub-Repository gebaut. Es gibt also absichtlich kein extern vorgebautes Image als Voraussetzung.
+
+Damit Updates trotzdem schneller werden, ist das Dockerfile so aufgebaut, dass teure Schritte besser gecacht werden:
+
+- `npm ci` laeuft in einer stabilen Dependency-Schicht
+- `prisma generate` wird nur noch neu ausgefuehrt, wenn sich `prisma/schema.prisma` oder die Paketdefinitionen aendern
+- normale App-Code-Aenderungen invalidieren damit vor allem nur noch den eigentlichen Next-Build
+- beim Containerstart werden Prisma-Befehle direkt aus `node_modules/.bin` ausgefuehrt, statt ueber `npx`
+
+Wichtig fuer Portainer:
+
+- Der erste Build auf einem neuen Geraet bleibt naturgemaess der langsamste.
+- Folge-Deployments werden nur dann schneller, wenn Docker-Images und Build-Cache auf dem Geraet erhalten bleiben.
+- Deshalb moeglichst keine manuellen Cache-/Image-Prunes zwischen normalen Stack-Updates ausfuehren.
+- Fuer normale Updates weiter den Stack direkt aus dem Git-Repository neu deployen.
 
 ### Empfohlener Portainer-Deploy
 

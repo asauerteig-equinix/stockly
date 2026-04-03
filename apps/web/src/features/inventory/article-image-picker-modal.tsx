@@ -151,9 +151,7 @@ export function ArticleImagePickerModal({
                     <p className="truncate font-medium text-slate-950" title={image.name}>
                       {image.name}
                     </p>
-                    <p className="truncate text-xs text-slate-500" title={image.fileName}>
-                      {isExternal ? "Externe Bild-URL" : image.fileName}
-                    </p>
+                    {isExternal ? <p className="truncate text-xs text-slate-500">Externe Bild-URL</p> : null}
                   </div>
                   {isSelected ? (
                     <Check className="h-4 w-4 shrink-0 text-primary" />

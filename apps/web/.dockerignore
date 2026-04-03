@@ -3,3 +3,12 @@ node_modules
 npm-debug.log
 Dockerfile
 *.md
+.env
+.env.*
+.git
+.gitignore
+coverage
+dist
+*.log
+*.local
+*.tsbuildinfo

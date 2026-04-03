@@ -7,6 +7,8 @@ const prisma = new PrismaClient();
 const autoSeed = (process.env.AUTO_SEED ?? "true").toLowerCase() === "true";
 const retryAttempts = 20;
 const retryDelayMs = 3000;
+const prismaCli = "./node_modules/.bin/prisma";
+const tsxCli = "./node_modules/.bin/tsx";
 
 function run(command) {
   execSync(command, {
@@ -56,11 +58,11 @@ async function maybeSeed() {
   }
 
   console.log("Leere Datenbank erkannt. Seed wird ausgefuehrt.");
-  run("npm run db:seed");
+  run(`${tsxCli} prisma/seed.ts`);
 }
 
 async function main() {
-  await runWithRetry("npx prisma migrate deploy");
+  await runWithRetry(`${prismaCli} migrate deploy`);
   await maybeSeed();
   await prisma.$disconnect();
 

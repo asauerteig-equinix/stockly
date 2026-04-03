@@ -117,9 +117,6 @@ export function ArticleMediaTools({ images }: { images: ArticleImageOption[] }) 
                   <p className="truncate text-sm font-medium text-slate-900" title={image.name}>
                     {image.name}
                   </p>
-                  <p className="truncate text-xs text-slate-500" title={image.fileName}>
-                    {image.fileName}
-                  </p>
                 </div>
                 <Button size="sm" variant="ghost" onClick={() => handleDelete(image.fileName)}>
                   <Trash2 className="h-4 w-4" />

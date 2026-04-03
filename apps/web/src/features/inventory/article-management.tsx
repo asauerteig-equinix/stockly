@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Archive, Boxes, FileUp, ImagePlus, Images, MapPin, Plus, Search, Sparkles, Trash2, TriangleAlert } from "lucide-react";
+import { Archive, Boxes, FileUp, Images, MapPin, Plus, Search, Sparkles, Trash2, TriangleAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -132,12 +132,12 @@ function getArticleImageSrc(imageUrl: string | null | undefined) {
 
 export function ArticleManagement({ locations, articles, images }: ArticleManagementProps) {
   const router = useRouter();
-  const formCardRef = useRef<HTMLDivElement | null>(null);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [isEditorOpen, setEditorOpen] = useState(false);
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [isMediaModalOpen, setMediaModalOpen] = useState(false);
   const [isImagePickerOpen, setImagePickerOpen] = useState(false);
@@ -243,6 +243,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
         }
 
         setSelectedArticleId(null);
+        setEditorOpen(false);
         router.refresh();
       } catch (error) {
         setFeedback({
@@ -253,19 +254,22 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
     });
   });
 
-  function focusFormWorkspace() {
-    formCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
   function startNewArticle() {
     setSelectedArticleId(null);
     form.reset(emptyValues(defaultFormLocationId));
-    focusFormWorkspace();
+    setEditorOpen(true);
   }
 
   function editArticle(article: ArticleEntry) {
     setSelectedArticleId(article.id);
-    focusFormWorkspace();
+    setEditorOpen(true);
+  }
+
+  function closeEditor() {
+    setEditorOpen(false);
+    setImagePickerOpen(false);
+    setSelectedArticleId(null);
+    form.reset(emptyValues(defaultFormLocationId));
   }
 
   async function toggleArchive(article: ArticleEntry) {
@@ -303,6 +307,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
         });
         if (selectedArticleId === article.id) {
           setSelectedArticleId(null);
+          setEditorOpen(false);
           form.reset(emptyValues(defaultFormLocationId));
         }
         router.refresh();
@@ -370,9 +375,193 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.12fr)_minmax(420px,0.88fr)]">
-        <div ref={formCardRef} className="order-2 2xl:order-2">
-          <Card className="border-white/80 bg-white/95 shadow-sm 2xl:sticky 2xl:top-6">
+      <Card className="border-white/80 bg-white/90 shadow-sm">
+        <CardHeader className="gap-4">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+            <div className="space-y-2">
+              <CardTitle>Artikelbestand und Pflege</CardTitle>
+              <CardDescription>
+                Die verfuegbaren Artikel stehen wieder voll im Fokus. Ein Klick auf einen Eintrag oeffnet die Bearbeitung als grosses Modal.
+              </CardDescription>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-secondary/60 px-4 py-3 text-sm text-slate-600">
+              <p>
+                <span className="font-semibold text-slate-950">{formatQuantity(filteredArticles.length)}</span> Artikel sichtbar
+              </p>
+              <p>
+                <span className="font-semibold text-slate-950">{formatQuantity(categories.length)}</span> Kategorien im Bestand
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_240px_200px_220px_auto]">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                className="pl-9"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Suche nach Name, Barcode, Zusatz-Barcode, Kategorie oder Standort"
+              />
+            </div>
+
+            <Select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}>
+              <option value="all">Alle Standorte</option>
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name} ({location.code})
+                </option>
+              ))}
+            </Select>
+
+            <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
+              <option value="all">Alle Stati</option>
+              <option value="active">Nur aktiv</option>
+              <option value="attention">Aufmerksamkeit</option>
+              <option value="archived">Nur archiviert</option>
+            </Select>
+
+            <Select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+              <option value="all">Alle Kategorien</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </Select>
+
+            <Button className="xl:min-w-[180px]" onClick={startNewArticle}>
+              <Plus className="mr-2 h-4 w-4" />
+              Neuer Artikel
+            </Button>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {filteredArticles.length ? (
+            <div className="overflow-hidden rounded-xl border border-border">
+              <div className="overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Artikel</TableHead>
+                      <TableHead>Kategorie</TableHead>
+                      <TableHead>Reihenfolge</TableHead>
+                      <TableHead>Standort</TableHead>
+                      <TableHead>Bestand</TableHead>
+                      <TableHead>Minimum</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Aktion</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredArticles.map((article) => {
+                      const attention = isLowStock(article);
+                      const selected = selectedArticleId === article.id && isEditorOpen;
+
+                      return (
+                        <TableRow
+                          key={article.id}
+                          className={cn("cursor-pointer transition", selected ? "bg-primary/5" : "hover:bg-slate-50")}
+                          onClick={() => editArticle(article)}
+                        >
+                          <TableCell className="min-w-[260px]">
+                            <div className="flex items-start gap-3">
+                              <img
+                                src={getArticleImageSrc(article.imageUrl)}
+                                alt={article.name}
+                                className="h-14 w-14 rounded-2xl border border-white bg-white object-cover shadow-sm"
+                              />
+                              <div className="space-y-1">
+                                <p className="font-medium text-slate-950">{article.name}</p>
+                                <p className="text-xs text-slate-500">Barcode {article.barcode}</p>
+                                {article.additionalBarcodes.length ? (
+                                  <p className="text-xs text-slate-500">
+                                    + {formatQuantity(article.additionalBarcodes.length)} weitere Barcodes
+                                  </p>
+                                ) : null}
+                                {article.description ? <p className="line-clamp-1 text-xs text-slate-500">{article.description}</p> : null}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{article.category}</TableCell>
+                          <TableCell>{formatQuantity(article.sortOrder)}</TableCell>
+                          <TableCell>
+                            <span className="inline-flex items-center gap-2 text-sm text-slate-700">
+                              <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                              {article.locationName}
+                            </span>
+                          </TableCell>
+                          <TableCell className="font-medium">{formatQuantity(article.quantity)}</TableCell>
+                          <TableCell>{formatQuantity(article.minimumStock)}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-2">
+                              {article.isArchived ? <Badge variant="muted">Archiviert</Badge> : <Badge variant="success">Aktiv</Badge>}
+                              {attention ? <Badge variant="warning">Unter Minimum</Badge> : null}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  editArticle(article);
+                                }}
+                              >
+                                Bearbeiten
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void toggleArchive(article);
+                                }}
+                              >
+                                {article.isArchived ? "Reaktivieren" : "Archivieren"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void deleteArticle(article);
+                                }}
+                              >
+                                Loeschen
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border bg-slate-50/80 px-6 py-10 text-center">
+              <p className="text-base font-medium text-slate-900">Keine passenden Artikel gefunden.</p>
+              <p className="mt-2 text-sm text-slate-500">
+                Passe Suche oder Filter an oder lege direkt einen neuen Artikel an.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Modal
+        open={isEditorOpen}
+        onClose={closeEditor}
+        title={selectedArticle ? `Artikel bearbeiten` : "Neuer Artikel"}
+        description="Die Bearbeitung laeuft jetzt bewusst als grosses Modal, damit die Artikelliste auf der Seite selbst voll sichtbar bleibt."
+        className="max-w-[min(96vw,92rem)]"
+        contentClassName="max-h-[calc(100vh-8rem)] px-0 py-0"
+      >
+        <Card className="border-none bg-transparent shadow-none">
           <CardHeader className="gap-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="space-y-2">
@@ -477,31 +666,9 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
 
                   <div className="grid gap-4 xl:grid-cols-2">
                     <div className="space-y-3 xl:col-span-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <Label>Bild</Label>
-                          <p className="text-xs text-slate-500">Ein Klick auf das Bild oeffnet die Auswahl als Modal.</p>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          <Button type="button" size="sm" variant="outline" onClick={() => setImagePickerOpen(true)}>
-                            <ImagePlus className="mr-2 h-4 w-4" />
-                            Bild waehlen
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              form.setValue("imageUrl", articlePlaceholderImage, {
-                                shouldDirty: true,
-                                shouldValidate: true
-                              })
-                            }
-                          >
-                            Platzhalter
-                          </Button>
-                        </div>
+                      <div>
+                        <Label>Bild</Label>
+                        <p className="text-xs text-slate-500">Ein Klick auf das Bild oeffnet die Auswahl als Modal.</p>
                       </div>
 
                       <div
@@ -528,18 +695,6 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                             </p>
                             <p className="text-xs text-slate-500">Zum Aendern einfach antippen oder anklicken.</p>
                           </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setMediaModalOpen(true);
-                            }}
-                          >
-                            <Images className="mr-2 h-4 w-4" />
-                            Bibliothek
-                          </Button>
                         </div>
                       </div>
                     </div>
@@ -706,10 +861,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => {
-                      setSelectedArticleId(null);
-                      form.reset(emptyValues(defaultFormLocationId));
-                    }}
+                    onClick={closeEditor}
                   >
                     Bearbeitung verlassen
                   </Button>
@@ -723,187 +875,8 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
               </datalist>
             </form>
           </CardContent>
-          </Card>
-        </div>
-
-        <Card className="order-1 border-white/80 bg-white/90 shadow-sm 2xl:order-1">
-        <CardHeader className="gap-4">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-            <div className="space-y-2">
-              <CardTitle>Artikelbestand und Pflege</CardTitle>
-              <CardDescription>
-                Die verfuegbaren Artikel stehen bewusst frueher im Fokus. Ein Klick auf einen Eintrag oeffnet ihn direkt rechts oder darunter zur Bearbeitung.
-              </CardDescription>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-secondary/60 px-4 py-3 text-sm text-slate-600">
-              <p>
-                <span className="font-semibold text-slate-950">{formatQuantity(filteredArticles.length)}</span> Artikel sichtbar
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">{formatQuantity(categories.length)}</span> Kategorien im Bestand
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_240px_200px_220px_auto]">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                className="pl-9"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Suche nach Name, Barcode, Zusatz-Barcode, Kategorie oder Standort"
-              />
-            </div>
-
-            <Select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}>
-              <option value="all">Alle Standorte</option>
-              {locations.map((location) => (
-                <option key={location.id} value={location.id}>
-                  {location.name} ({location.code})
-                </option>
-              ))}
-            </Select>
-
-            <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
-              <option value="all">Alle Stati</option>
-              <option value="active">Nur aktiv</option>
-              <option value="attention">Aufmerksamkeit</option>
-              <option value="archived">Nur archiviert</option>
-            </Select>
-
-            <Select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-              <option value="all">Alle Kategorien</option>
-              {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </Select>
-
-            <Button className="xl:min-w-[180px]" onClick={startNewArticle}>
-              <Plus className="mr-2 h-4 w-4" />
-              Neuer Artikel
-            </Button>
-          </div>
-        </CardHeader>
-
-          <CardContent className="space-y-4">
-          {filteredArticles.length ? (
-            <div className="overflow-hidden rounded-xl border border-border">
-              <div className="max-h-[min(70vh,54rem)] overflow-auto 2xl:max-h-[calc(100vh-18rem)]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Artikel</TableHead>
-                      <TableHead>Kategorie</TableHead>
-                      <TableHead>Reihenfolge</TableHead>
-                      <TableHead>Standort</TableHead>
-                      <TableHead>Bestand</TableHead>
-                      <TableHead>Minimum</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Aktion</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredArticles.map((article) => {
-                      const attention = isLowStock(article);
-                      const selected = selectedArticleId === article.id;
-
-                      return (
-                        <TableRow
-                          key={article.id}
-                          className={cn("cursor-pointer transition", selected ? "bg-primary/5" : "hover:bg-slate-50")}
-                          onClick={() => editArticle(article)}
-                        >
-                          <TableCell className="min-w-[260px]">
-                            <div className="flex items-start gap-3">
-                              <img
-                                src={getArticleImageSrc(article.imageUrl)}
-                                alt={article.name}
-                                className="h-14 w-14 rounded-2xl border border-white bg-white object-cover shadow-sm"
-                              />
-                              <div className="space-y-1">
-                                <p className="font-medium text-slate-950">{article.name}</p>
-                                <p className="text-xs text-slate-500">Barcode {article.barcode}</p>
-                                {article.additionalBarcodes.length ? (
-                                  <p className="text-xs text-slate-500">
-                                    + {formatQuantity(article.additionalBarcodes.length)} weitere Barcodes
-                                  </p>
-                                ) : null}
-                                {article.description ? <p className="line-clamp-1 text-xs text-slate-500">{article.description}</p> : null}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>{article.category}</TableCell>
-                          <TableCell>{formatQuantity(article.sortOrder)}</TableCell>
-                          <TableCell>
-                            <span className="inline-flex items-center gap-2 text-sm text-slate-700">
-                              <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                              {article.locationName}
-                            </span>
-                          </TableCell>
-                          <TableCell className="font-medium">{formatQuantity(article.quantity)}</TableCell>
-                          <TableCell>{formatQuantity(article.minimumStock)}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-2">
-                              {article.isArchived ? <Badge variant="muted">Archiviert</Badge> : <Badge variant="success">Aktiv</Badge>}
-                              {attention ? <Badge variant="warning">Unter Minimum</Badge> : null}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  editArticle(article);
-                                }}
-                              >
-                                Bearbeiten
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  void toggleArchive(article);
-                                }}
-                              >
-                                {article.isArchived ? "Reaktivieren" : "Archivieren"}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  void deleteArticle(article);
-                                }}
-                              >
-                                Loeschen
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-border bg-slate-50/80 px-6 py-10 text-center">
-              <p className="text-base font-medium text-slate-900">Keine passenden Artikel gefunden.</p>
-              <p className="mt-2 text-sm text-slate-500">
-                Passe Suche oder Filter an oder lege direkt einen neuen Artikel an.
-              </p>
-            </div>
-          )}
-        </CardContent>
         </Card>
-      </div>
+      </Modal>
 
       <Modal
         open={isImportModalOpen}

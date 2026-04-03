@@ -1,21 +1,25 @@
-FROM node:22-alpine AS deps
+FROM node:22-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
-COPY package.json package-lock.json ./
-RUN npm ci
+ENV NEXT_TELEMETRY_DISABLED=1
 
-FROM deps AS builder
+FROM base AS deps
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+FROM deps AS prisma
+COPY prisma ./prisma
+RUN npx prisma generate
+
+FROM prisma AS builder
 ARG BASE_PATH=""
 ENV BASE_PATH=$BASE_PATH
 COPY . .
-RUN npx prisma generate
 RUN npm run build
 
-FROM node:22-alpine AS production
-WORKDIR /app
+FROM base AS production
 ENV NODE_ENV=production
-RUN apk add --no-cache libc6-compat
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=prisma /app/node_modules ./node_modules
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
