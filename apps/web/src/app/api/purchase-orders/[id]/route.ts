@@ -2,11 +2,10 @@ import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/server/auth";
 import { prisma } from "@/server/db";
-import { submitPurchaseOrder } from "@/server/orders";
+import { deletePurchaseOrder } from "@/server/orders";
 import { assertLocationAccess, apiError } from "@/server/permissions";
-import { purchaseOrderSubmitSchema } from "@/server/validation";
 
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
 
@@ -26,19 +25,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
 
     if (!order) {
-      throw new Error("Bestellung nicht gefunden.");
+      return apiError(new Error("Bestellung nicht gefunden."), 404);
     }
 
     assertLocationAccess(user, order.locationId);
-
-    const body = purchaseOrderSubmitSchema.parse(await request.json());
-    const updatedOrder = await submitPurchaseOrder({
-      orderId: id,
-      userId: user.id,
-      note: body.note ?? null
+    await deletePurchaseOrder({
+      orderId: id
     });
 
-    return NextResponse.json({ ok: true, orderId: updatedOrder.id });
+    return NextResponse.json({
+      ok: true
+    });
   } catch (error) {
     return apiError(error);
   }

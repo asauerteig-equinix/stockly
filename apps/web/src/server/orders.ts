@@ -292,3 +292,24 @@ export async function submitPurchaseOrder(input: {
     });
   });
 }
+
+export async function deletePurchaseOrder(input: { orderId: string }) {
+  const order = await prisma.purchaseOrder.findUnique({
+    where: {
+      id: input.orderId
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (!order) {
+    throw new Error("Bestellung nicht gefunden.");
+  }
+
+  await prisma.purchaseOrder.delete({
+    where: {
+      id: input.orderId
+    }
+  });
+}

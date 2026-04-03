@@ -7,7 +7,7 @@ import { CheckCircle2, ClipboardList, Layers3, PackagePlus, Plus, ShoppingCart, 
 
 import { OrderStatusBadge } from "@/features/orders/order-status-badge";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { buttonVariants, Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormFeedback } from "@/components/ui/form-feedback";
 import { Input } from "@/components/ui/input";
@@ -241,19 +241,46 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
 
     startTransition(async () => {
       try {
-        await fetchJson(`/api/purchase-orders/${activeDraft.id}/submit`, {
+        const response = await fetchJson<{ ok: boolean; orderId: string }>(`/api/purchase-orders/${activeDraft.id}/submit`, {
           method: "POST",
           body: JSON.stringify({
             note
           })
         });
-        setFeedback({ tone: "success", message: "Bestellung wurde als abgeschlossen markiert." });
+        setFeedback({ tone: "success", message: "Bestellung wurde abgeschlossen. Die Detailansicht wird geoeffnet." });
         setNote("");
+        router.push(`/admin/orders/${response.orderId}`);
         router.refresh();
       } catch (error) {
         setFeedback({
           tone: "error",
           message: error instanceof Error ? error.message : "Bestellung konnte nicht abgeschlossen werden."
+        });
+      }
+    });
+  }
+
+  function handleDeleteOrder() {
+    if (!activeDraft) {
+      return;
+    }
+
+    if (!window.confirm(`Entwurf ${activeDraft.orderNumber} wirklich loeschen?`)) {
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await fetchJson(`/api/purchase-orders/${activeDraft.id}`, {
+          method: "DELETE"
+        });
+        setFeedback({ tone: "success", message: "Der Bestellentwurf wurde geloescht." });
+        setNote("");
+        router.refresh();
+      } catch (error) {
+        setFeedback({
+          tone: "error",
+          message: error instanceof Error ? error.message : "Bestellung konnte nicht geloescht werden."
         });
       }
     });
@@ -477,7 +504,9 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
               <div>
                 <CardTitle>Aktiver Bestellentwurf</CardTitle>
                 <CardDescription>
-                  {activeDraft ? `${activeDraft.orderNumber} · zuletzt aktualisiert ${activeDraft.updatedAtLabel}` : "Sobald du Artikel hinzufuegst, entsteht hier automatisch ein Entwurf."}
+                  {activeDraft
+                    ? `${activeDraft.orderNumber} / zuletzt aktualisiert ${activeDraft.updatedAtLabel}`
+                    : "Sobald du Artikel hinzufuegst, entsteht hier automatisch ein Entwurf."}
                 </CardDescription>
               </div>
               {activeDraft ? <OrderStatusBadge status="DRAFT" /> : null}
@@ -566,6 +595,19 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
                   <CheckCircle2 className="mr-2 h-4 w-4" />
                   {isPending ? "Speichert..." : "Bestellung abschliessen"}
                 </Button>
+
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    href={`/admin/orders/${activeDraft.id}`}
+                    className={buttonVariants({ variant: "outline", className: "flex-1" })}
+                  >
+                    Details ansehen
+                  </Link>
+                  <Button variant="destructive" className="flex-1" disabled={isPending} onClick={handleDeleteOrder}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Entwurf loeschen
+                  </Button>
+                </div>
               </>
             ) : (
               <div className="rounded-2xl border border-dashed border-border bg-slate-50/80 px-6 py-10 text-center">

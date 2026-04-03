@@ -1,16 +1,14 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageIntro } from "@/components/layout/page-intro";
-import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { OrderDetailActions } from "@/features/orders/order-detail-actions";
 import { OrderStatusBadge } from "@/features/orders/order-status-badge";
 import { articlePlaceholderImage } from "@/lib/article-images";
 import { withBasePath } from "@/lib/base-path";
 import { requireUser } from "@/server/auth";
-import { prisma } from "@/server/db";
 import { formatDateTime, formatQuantity } from "@/server/format";
-import { assertLocationAccess } from "@/server/permissions";
+import { getPurchaseOrderForUser } from "@/server/order-documents";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -19,26 +17,11 @@ type PageProps = {
 export default async function OrderDetailPage({ params }: PageProps) {
   const user = await requireUser();
   const { id } = await params;
-
-  const order = await prisma.purchaseOrder.findUnique({
-    where: {
-      id
-    },
-    include: {
-      location: true,
-      createdByUser: true,
-      updatedByUser: true,
-      items: {
-        orderBy: [{ categorySnapshot: "asc" }, { articleNameSnapshot: "asc" }]
-      }
-    }
-  });
+  const order = await getPurchaseOrderForUser(id, user);
 
   if (!order) {
     notFound();
   }
-
-  assertLocationAccess(user, order.locationId);
 
   return (
     <div className="space-y-8">
@@ -47,11 +30,12 @@ export default async function OrderDetailPage({ params }: PageProps) {
         description="Bestelldetails mit Standort, Verlauf und allen Positionen der zusammengestellten Nachbestellung."
       />
 
-      <div className="flex flex-wrap gap-3">
-        <Link href="/admin/orders" className={buttonVariants({ variant: "outline" })}>
-          Zurueck zu Bestellungen
-        </Link>
-      </div>
+      <OrderDetailActions
+        orderId={order.id}
+        orderNumber={order.orderNumber}
+        emailHref={`/admin/orders/${order.id}/email`}
+        pdfHref={`/api/purchase-orders/${order.id}/pdf`}
+      />
 
       <section className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
         <Card className="border-white/80 bg-white/95">
