@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { articlePlaceholderImage } from "@/lib/article-images";
 import { normalizeBarcode, sanitizeAdditionalBarcodes } from "@/lib/barcodes";
 import { getCurrentUser } from "@/server/auth";
 import { prisma } from "@/server/db";
@@ -32,9 +33,7 @@ export async function GET() {
           }
         }
       },
-      orderBy: {
-        name: "asc"
-      }
+      orderBy: [{ isArchived: "asc" }, { category: "asc" }, { sortOrder: "asc" }, { name: "asc" }]
     });
 
     return NextResponse.json({ articles });
@@ -67,6 +66,8 @@ export async function POST(request: Request) {
           manufacturerNumber: body.manufacturerNumber ?? null,
           supplierNumber: body.supplierNumber ?? null,
           category: body.category,
+          imageUrl: body.imageUrl || articlePlaceholderImage,
+          sortOrder: body.sortOrder,
           minimumStock: body.minimumStock,
           isArchived: body.isArchived
         }

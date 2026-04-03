@@ -49,9 +49,12 @@ async function applyMovement(articleId: string, locationId: string, movement: Se
 
 async function main() {
   await prisma.adminSession.deleteMany();
+  await prisma.purchaseOrderItem.deleteMany();
+  await prisma.purchaseOrder.deleteMany();
   await prisma.stockMovement.deleteMany();
   await prisma.inventoryBalance.deleteMany();
   await prisma.kioskDevice.deleteMany();
+  await prisma.articleImage.deleteMany();
   await prisma.userLocation.deleteMany();
   await prisma.locationSettings.deleteMany();
   await prisma.article.deleteMany();
@@ -131,6 +134,7 @@ async function main() {
         manufacturerNumber: "SFP-10G-SM",
         supplierNumber: "SUP-001",
         category: "Optik",
+        sortOrder: 1,
         minimumStock: 5
       },
       {
@@ -141,6 +145,7 @@ async function main() {
         manufacturerNumber: "LC5M",
         supplierNumber: "SUP-010",
         category: "Kabel",
+        sortOrder: 1,
         minimumStock: 12
       },
       {
@@ -151,6 +156,7 @@ async function main() {
         manufacturerNumber: "SW24-MG",
         supplierNumber: "SUP-122",
         category: "Hardware",
+        sortOrder: 1,
         minimumStock: 2
       },
       {
@@ -161,6 +167,7 @@ async function main() {
         manufacturerNumber: "RACK-1HE",
         supplierNumber: "SUP-051",
         category: "Rack",
+        sortOrder: 1,
         minimumStock: 1
       },
       {
@@ -171,6 +178,7 @@ async function main() {
         manufacturerNumber: "MC-1G",
         supplierNumber: "SUP-221",
         category: "Hardware",
+        sortOrder: 1,
         minimumStock: 3
       }
     ].map((item) => prisma.article.create({ data: item }))

@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FormFeedback } from "@/components/ui/form-feedback";
+import { articlePlaceholderImage } from "@/lib/article-images";
 import { normalizeBarcode } from "@/lib/barcodes";
+import { withBasePath } from "@/lib/base-path";
 import { cn } from "@/lib/cn";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatQuantity } from "@/server/format";
@@ -27,6 +29,7 @@ type ArticleResult = {
   name: string;
   barcode: string;
   additionalBarcodes: string[];
+  imageUrl: string | null;
   description: string | null;
   category: string;
   minimumStock: number;
@@ -96,6 +99,10 @@ function compareArticles(left: ArticleResult, right: ArticleResult, popularityRa
   }
 
   return compareText(left.name, right.name);
+}
+
+function getArticleImageSrc(imageUrl: string | null | undefined) {
+  return withBasePath(imageUrl || articlePlaceholderImage);
 }
 
 function groupArticlesByCategory(articles: ArticleResult[]) {
@@ -566,13 +573,20 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                         : "border-white/10 bg-slate-900/80 hover:border-cyan-400/30 hover:bg-slate-900"
                     )}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
+                    <div className="flex items-start gap-3">
+                      <img
+                        src={getArticleImageSrc(article.imageUrl)}
+                        alt={article.name}
+                        className="h-16 w-16 rounded-2xl border border-white/10 bg-white/10 object-cover"
+                      />
+                      <div className="min-w-0 flex-1">
                         <p className="font-semibold text-white">{article.name}</p>
                         <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{article.barcode}</p>
                       </div>
-                      {bookingSuccess?.articleId === article.id ? <Badge variant="success">Zuletzt</Badge> : null}
-                      {bookingSuccess?.articleId !== article.id && isAttention(article) ? <Badge variant="warning">Niedrig</Badge> : null}
+                      <div className="flex flex-col gap-2">
+                        {bookingSuccess?.articleId === article.id ? <Badge variant="success">Zuletzt</Badge> : null}
+                        {bookingSuccess?.articleId !== article.id && isAttention(article) ? <Badge variant="warning">Niedrig</Badge> : null}
+                      </div>
                     </div>
                     <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-300">
                       <span>Bestand {formatQuantity(article.quantity)}</span>
@@ -630,9 +644,16 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <h2 className="text-[clamp(1.75rem,4vh,2.4rem)] font-semibold text-white">{selectedArticle.name}</h2>
-                    <p className="mt-2 text-sm text-slate-300">{selectedArticle.barcode}</p>
+                  <div className="flex min-w-0 items-start gap-4">
+                    <img
+                      src={getArticleImageSrc(selectedArticle.imageUrl)}
+                      alt={selectedArticle.name}
+                      className="h-24 w-24 rounded-[1.5rem] border border-white/10 bg-white/10 object-cover"
+                    />
+                    <div className="min-w-0">
+                      <h2 className="text-[clamp(1.75rem,4vh,2.4rem)] font-semibold text-white">{selectedArticle.name}</h2>
+                      <p className="mt-2 text-sm text-slate-300">{selectedArticle.barcode}</p>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-3">

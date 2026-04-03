@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Archive, Boxes, MapPin, Plus, Search, Sparkles, TriangleAlert } from "lucide-react";
+import { Archive, Boxes, MapPin, Plus, Search, Sparkles, Trash2, TriangleAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -16,7 +16,11 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { ArticleImportTools } from "@/features/inventory/article-import-tools";
+import { ArticleMediaTools } from "@/features/inventory/article-media-tools";
+import { articlePlaceholderImage } from "@/lib/article-images";
 import { formatBarcodeListInput, parseBarcodeListInput } from "@/lib/barcodes";
+import { withBasePath } from "@/lib/base-path";
 import { cn } from "@/lib/cn";
 import { fetchJson } from "@/lib/fetch-json";
 import { formatQuantity } from "@/server/format";
@@ -40,10 +44,12 @@ type ArticleEntry = {
   name: string;
   barcode: string;
   additionalBarcodes: string[];
+  imageUrl: string | null;
   description: string | null;
   manufacturerNumber: string | null;
   supplierNumber: string | null;
   category: string;
+  sortOrder: number;
   minimumStock: number;
   isArchived: boolean;
   locationName: string;
@@ -53,6 +59,11 @@ type ArticleEntry = {
 type ArticleManagementProps = {
   locations: LocationOption[];
   articles: ArticleEntry[];
+  images: Array<{
+    fileName: string;
+    name: string;
+    url: string;
+  }>;
 };
 
 type StatusFilter = "all" | "active" | "archived" | "attention";
@@ -64,10 +75,12 @@ const emptyValues = (locationId: string): ArticleFormValues => ({
   name: "",
   barcode: "",
   additionalBarcodesInput: "",
+  imageUrl: articlePlaceholderImage,
   description: "",
   manufacturerNumber: "",
   supplierNumber: "",
   category: "",
+  sortOrder: 0,
   minimumStock: 0,
   isArchived: false
 });
@@ -111,7 +124,11 @@ function StatCard({
   );
 }
 
-export function ArticleManagement({ locations, articles }: ArticleManagementProps) {
+function getArticleImageSrc(imageUrl: string | null | undefined) {
+  return withBasePath(imageUrl || articlePlaceholderImage);
+}
+
+export function ArticleManagement({ locations, articles, images }: ArticleManagementProps) {
   const router = useRouter();
   const formCardRef = useRef<HTMLDivElement | null>(null);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
@@ -135,6 +152,7 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
     defaultValues: emptyValues(locations[0]?.id ?? "")
   });
   const currentLocationId = form.watch("locationId");
+  const selectedImageUrl = form.watch("imageUrl");
 
   useEffect(() => {
     if (selectedArticle) {
@@ -144,10 +162,12 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
         name: selectedArticle.name,
         barcode: selectedArticle.barcode,
         additionalBarcodesInput: formatBarcodeListInput(selectedArticle.additionalBarcodes),
+        imageUrl: selectedArticle.imageUrl ?? articlePlaceholderImage,
         description: selectedArticle.description ?? "",
         manufacturerNumber: selectedArticle.manufacturerNumber ?? "",
         supplierNumber: selectedArticle.supplierNumber ?? "",
         category: selectedArticle.category,
+        sortOrder: selectedArticle.sortOrder,
         minimumStock: selectedArticle.minimumStock,
         isArchived: selectedArticle.isArchived
       });
@@ -164,7 +184,8 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
 
   const filteredArticles = useMemo(() => {
     return articles.filter((article) => {
-      const haystack = `${article.name} ${article.barcode} ${article.additionalBarcodes.join(" ")} ${article.category} ${article.locationName}`.toLowerCase();
+      const haystack =
+        `${article.name} ${article.barcode} ${article.additionalBarcodes.join(" ")} ${article.category} ${article.locationName} ${article.manufacturerNumber ?? ""} ${article.supplierNumber ?? ""}`.toLowerCase();
       const matchesSearch = haystack.includes(search.toLowerCase());
       const matchesLocation = locationFilter === "all" || article.locationId === locationFilter;
       const matchesCategory = categoryFilter === "all" || article.category === categoryFilter;
@@ -264,6 +285,30 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
     });
   }
 
+  async function deleteArticle(article: ArticleEntry) {
+    startTransition(async () => {
+      try {
+        await fetchJson(`/api/articles/${article.id}`, {
+          method: "DELETE"
+        });
+        setFeedback({
+          tone: "success",
+          message: "Artikel wurde geloescht."
+        });
+        if (selectedArticleId === article.id) {
+          setSelectedArticleId(null);
+          form.reset(emptyValues(locationFilter !== "all" ? locationFilter : locations[0]?.id ?? ""));
+        }
+        router.refresh();
+      } catch (error) {
+        setFeedback({
+          tone: "error",
+          message: error instanceof Error ? error.message : "Artikel konnte nicht geloescht werden."
+        });
+      }
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
@@ -291,6 +336,11 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
           hint="Aktive Artikel unter oder auf Mindestbestand."
           icon={TriangleAlert}
         />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <ArticleImportTools />
+        <ArticleMediaTools images={images} />
       </div>
 
       <div ref={formCardRef}>
@@ -330,11 +380,31 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
                     {selectedArticle.isArchived ? "Artikel reaktivieren" : "Artikel archivieren"}
                   </Button>
                 ) : null}
+                {selectedArticle ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => {
+                      void deleteArticle(selectedArticle);
+                    }}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Artikel loeschen
+                  </Button>
+                ) : null}
               </div>
             </div>
 
             {selectedArticle ? (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                <div className="rounded-2xl bg-secondary/70 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Bild</p>
+                  <img
+                    src={getArticleImageSrc(selectedArticle.imageUrl)}
+                    alt={selectedArticle.name}
+                    className="mt-3 h-20 w-full rounded-2xl border border-white bg-white object-cover"
+                  />
+                </div>
                 <div className="rounded-2xl bg-secondary/70 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Standort</p>
                   <p className="mt-1 text-base font-semibold text-slate-950">{selectedArticle.locationName}</p>
@@ -374,7 +444,16 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
                       <Sparkles className="h-4 w-4 text-primary" />
                       <h3 className="text-sm font-semibold">Stammdaten</h3>
                     </div>
-                    <p className="text-sm text-slate-500">Name, Hauptbarcode, optionale Zusatz-Barcodes, Standort und Kategorie bilden die Basis fuer Suche, Scanner und Buchung.</p>
+                    <p className="text-sm text-slate-500">Name, Bild, Hauptbarcode, Zusatz-Barcodes, Standort und Kategorie bilden die Basis fuer Suche, Scanner, Bestellung und Kiosk.</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-border/70 bg-white/90 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Aktuelles Artikelbild</p>
+                    <img
+                      src={getArticleImageSrc(selectedImageUrl)}
+                      alt="Vorschau des gewaehlten Artikelbildes"
+                      className="mt-3 h-36 w-full rounded-2xl border border-slate-200 bg-white object-cover"
+                    />
                   </div>
 
                   <div className="grid gap-4 xl:grid-cols-2">
@@ -400,6 +479,24 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
                         ))}
                       </Select>
                       <FieldError message={form.formState.errors.locationId?.message} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="imageUrl">Bild</Label>
+                      <Select id="imageUrl" {...form.register("imageUrl")}>
+                        <option value={articlePlaceholderImage}>Platzhalter verwenden</option>
+                        {selectedImageUrl &&
+                        selectedImageUrl !== articlePlaceholderImage &&
+                        !images.some((image) => image.url === selectedImageUrl) ? (
+                          <option value={selectedImageUrl}>Aktuelle externe Bild-URL</option>
+                        ) : null}
+                        {images.map((image) => (
+                          <option key={image.fileName} value={image.url}>
+                            {image.name}
+                          </option>
+                        ))}
+                      </Select>
+                      <p className="text-xs text-slate-500">Bilder lassen sich oben in der Bildbibliothek hochladen.</p>
                     </div>
 
                     <div className="space-y-2 xl:col-span-2">
@@ -445,6 +542,13 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
                           ))}
                         </div>
                       ) : null}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="sortOrder">Reihenfolge</Label>
+                      <Input id="sortOrder" type="number" min={0} {...form.register("sortOrder")} />
+                      <FieldError message={form.formState.errors.sortOrder?.message} />
+                      <p className="text-xs text-slate-500">Steuert die Reihenfolge innerhalb der Kategorie.</p>
                     </div>
                   </div>
                 </section>
@@ -625,6 +729,7 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
                     <TableRow>
                       <TableHead>Artikel</TableHead>
                       <TableHead>Kategorie</TableHead>
+                      <TableHead>Reihenfolge</TableHead>
                       <TableHead>Standort</TableHead>
                       <TableHead>Bestand</TableHead>
                       <TableHead>Minimum</TableHead>
@@ -644,18 +749,26 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
                           onClick={() => editArticle(article)}
                         >
                           <TableCell className="min-w-[260px]">
-                            <div className="space-y-1">
-                              <p className="font-medium text-slate-950">{article.name}</p>
-                              <p className="text-xs text-slate-500">Barcode {article.barcode}</p>
-                              {article.additionalBarcodes.length ? (
-                                <p className="text-xs text-slate-500">
-                                  + {formatQuantity(article.additionalBarcodes.length)} weitere Barcodes
-                                </p>
-                              ) : null}
-                              {article.description ? <p className="line-clamp-1 text-xs text-slate-500">{article.description}</p> : null}
+                            <div className="flex items-start gap-3">
+                              <img
+                                src={getArticleImageSrc(article.imageUrl)}
+                                alt={article.name}
+                                className="h-14 w-14 rounded-2xl border border-white bg-white object-cover shadow-sm"
+                              />
+                              <div className="space-y-1">
+                                <p className="font-medium text-slate-950">{article.name}</p>
+                                <p className="text-xs text-slate-500">Barcode {article.barcode}</p>
+                                {article.additionalBarcodes.length ? (
+                                  <p className="text-xs text-slate-500">
+                                    + {formatQuantity(article.additionalBarcodes.length)} weitere Barcodes
+                                  </p>
+                                ) : null}
+                                {article.description ? <p className="line-clamp-1 text-xs text-slate-500">{article.description}</p> : null}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>{article.category}</TableCell>
+                          <TableCell>{formatQuantity(article.sortOrder)}</TableCell>
                           <TableCell>
                             <span className="inline-flex items-center gap-2 text-sm text-slate-700">
                               <MapPin className="h-3.5 w-3.5 text-slate-400" />
@@ -691,6 +804,16 @@ export function ArticleManagement({ locations, articles }: ArticleManagementProp
                                 }}
                               >
                                 {article.isArchived ? "Reaktivieren" : "Archivieren"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void deleteArticle(article);
+                                }}
+                              >
+                                Loeschen
                               </Button>
                             </div>
                           </TableCell>

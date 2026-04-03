@@ -1,5 +1,6 @@
 import { PageIntro } from "@/components/layout/page-intro";
 import { ArticleManagement } from "@/features/inventory/article-management";
+import { buildArticleImageUrl } from "@/lib/article-images";
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 
@@ -14,7 +15,7 @@ export default async function ArticlesPage() {
           }
         };
 
-  const [locations, articles] = await Promise.all([
+  const [locations, articles, images] = await Promise.all([
     prisma.location.findMany({
       where: locationFilter,
       orderBy: {
@@ -39,7 +40,14 @@ export default async function ArticlesPage() {
           }
         }
       },
-      orderBy: [{ isArchived: "asc" }, { name: "asc" }]
+      orderBy: [{ isArchived: "asc" }, { category: "asc" }, { sortOrder: "asc" }, { name: "asc" }]
+    }),
+    prisma.articleImage.findMany({
+      orderBy: [{ createdAt: "asc" }, { originalName: "asc" }],
+      select: {
+        fileName: true,
+        originalName: true
+      }
     })
   ]);
 
@@ -47,7 +55,7 @@ export default async function ArticlesPage() {
     <div className="space-y-8">
       <PageIntro
         title="Artikelverwaltung"
-        description="Artikel werden standortbezogen gepflegt. Ein Hauptbarcode bleibt Pflicht, weitere Hersteller-Barcodes koennen optional dem gleichen Artikel zugeordnet werden."
+        description="Artikel werden standortbezogen gepflegt. Bilder, Import, Sortierung und weitere Hersteller-Barcodes sorgen fuer eine schnellere Identifikation in Admin, Bestellung und Kiosk."
       />
 
       <ArticleManagement
@@ -62,14 +70,21 @@ export default async function ArticlesPage() {
           name: article.name,
           barcode: article.barcode,
           additionalBarcodes: article.articleBarcodes.map((entry) => entry.barcode),
+          imageUrl: article.imageUrl,
           description: article.description,
           manufacturerNumber: article.manufacturerNumber,
           supplierNumber: article.supplierNumber,
           category: article.category,
+          sortOrder: article.sortOrder,
           minimumStock: article.minimumStock,
           isArchived: article.isArchived,
           locationName: article.location.name,
           quantity: article.inventoryBalance?.quantity ?? 0
+        }))}
+        images={images.map((image) => ({
+          fileName: image.fileName,
+          name: image.originalName,
+          url: buildArticleImageUrl(image.fileName)
         }))}
       />
     </div>

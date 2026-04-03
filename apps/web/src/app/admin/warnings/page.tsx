@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageIntro } from "@/components/layout/page-intro";
+import { AddToOrderButton } from "@/features/orders/add-to-order-button";
 import { requireUser } from "@/server/auth";
 import { formatQuantity } from "@/server/format";
 import { getWarnings } from "@/server/warnings";
@@ -30,6 +31,7 @@ export default async function WarningsPage() {
                   <TableHead>Standort</TableHead>
                   <TableHead>Bestand</TableHead>
                   <TableHead>Mindestbestand</TableHead>
+                  <TableHead className="text-right">Aktion</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -39,6 +41,16 @@ export default async function WarningsPage() {
                     <TableCell>{entry.location.name}</TableCell>
                     <TableCell>{formatQuantity(entry.quantity)}</TableCell>
                     <TableCell>{formatQuantity(entry.article.minimumStock)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end">
+                        <AddToOrderButton
+                          locationId={entry.locationId}
+                          articleIds={[entry.articleId]}
+                          label="Zur Bestellung"
+                          redirectToOrders
+                        />
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

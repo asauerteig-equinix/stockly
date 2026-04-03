@@ -48,7 +48,7 @@ export default async function KioskPage() {
               }
             }
           },
-          orderBy: [{ category: "asc" }, { name: "asc" }]
+          orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { name: "asc" }]
         }),
         prisma.stockMovement.findMany({
           where: {
@@ -101,6 +101,7 @@ export default async function KioskPage() {
               name: article.name,
               barcode: article.barcode,
               additionalBarcodes: article.articleBarcodes.map((entry) => entry.barcode),
+              imageUrl: article.imageUrl,
               description: article.description,
               category: article.category,
               minimumStock: article.minimumStock,

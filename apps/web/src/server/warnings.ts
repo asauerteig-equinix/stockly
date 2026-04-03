@@ -8,9 +8,16 @@ export async function getWarnings(locationIds?: string[]) {
   const balances = await prisma.inventoryBalance.findMany({
     where: locationIdFilter
       ? {
-          locationId: locationIdFilter
+          locationId: locationIdFilter,
+          article: {
+            isArchived: false
+          }
         }
-      : undefined,
+      : {
+          article: {
+            isArchived: false
+          }
+        },
     include: {
       article: true,
       location: {

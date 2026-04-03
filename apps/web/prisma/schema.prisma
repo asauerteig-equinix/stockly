@@ -24,6 +24,11 @@ enum SourceType {
   KIOSK
 }
 
+enum PurchaseOrderStatus {
+  DRAFT
+  ORDERED
+}
+
 model User {
   id                String          @id @default(cuid())
   email             String          @unique
@@ -36,6 +41,8 @@ model User {
   sessions          AdminSession[]
   assignedLocations UserLocation[]
   createdMovements  StockMovement[] @relation("CreatedByUser")
+  createdPurchaseOrders PurchaseOrder[] @relation("PurchaseOrderCreatedBy")
+  updatedPurchaseOrders PurchaseOrder[] @relation("PurchaseOrderUpdatedBy")
 }
 
 model AdminSession {
@@ -65,6 +72,7 @@ model Location {
   stockMovements    StockMovement[]
   kioskDevices      KioskDevice[]
   adminAssignments  UserLocation[]
+  purchaseOrders    PurchaseOrder[]
 
   @@index([isActive])
 }
@@ -97,10 +105,12 @@ model Article {
   name               String
   barcode            String
   articleBarcodes    ArticleBarcode[]
+  imageUrl           String?
   description        String?
   manufacturerNumber String?
   supplierNumber     String?
   category           String
+  sortOrder          Int               @default(0)
   minimumStock       Int               @default(0)
   isArchived         Boolean           @default(false)
   createdAt          DateTime          @default(now())
@@ -108,11 +118,24 @@ model Article {
   location           Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
   inventoryBalance   InventoryBalance?
   stockMovements     StockMovement[]
+  purchaseOrderItems PurchaseOrderItem[]
 
   @@unique([locationId, barcode])
   @@index([locationId, name])
-  @@index([locationId, category])
+  @@index([locationId, category, sortOrder])
   @@index([isArchived])
+}
+
+model ArticleImage {
+  id           String   @id @default(cuid())
+  fileName     String   @unique
+  originalName String
+  mimeType     String
+  data         Bytes
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([createdAt])
 }
 
 model ArticleBarcode {
@@ -161,6 +184,52 @@ model StockMovement {
   @@index([locationId, createdAt(sort: Desc)])
   @@index([articleId, createdAt(sort: Desc)])
   @@index([type, createdAt(sort: Desc)])
+}
+
+model PurchaseOrder {
+  id              String              @id @default(cuid())
+  orderNumber     String              @unique
+  locationId      String
+  status          PurchaseOrderStatus @default(DRAFT)
+  note            String?
+  createdByUserId String
+  updatedByUserId String?
+  location        Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  createdByUser   User                @relation("PurchaseOrderCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedByUser   User?               @relation("PurchaseOrderUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  items           PurchaseOrderItem[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  submittedAt     DateTime?
+
+  @@index([locationId, status])
+  @@index([createdByUserId])
+  @@index([updatedByUserId])
+  @@index([createdAt])
+}
+
+model PurchaseOrderItem {
+  id                       String        @id @default(cuid())
+  purchaseOrderId          String
+  articleId                String
+  quantity                 Int
+  suggestedQuantity        Int           @default(1)
+  articleNameSnapshot      String
+  barcodeSnapshot          String
+  categorySnapshot         String
+  imageUrlSnapshot         String?
+  currentQuantitySnapshot  Int           @default(0)
+  minimumStockSnapshot     Int           @default(0)
+  manufacturerNumberSnapshot String?
+  supplierNumberSnapshot   String?
+  purchaseOrder            PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  article                  Article       @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+
+  @@unique([purchaseOrderId, articleId])
+  @@index([purchaseOrderId])
+  @@index([articleId])
 }
 
 model KioskDevice {

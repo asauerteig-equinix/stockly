@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, Boxes, Building2, Shield, TriangleAlert, Warehouse } from "lucide-react";
+import { BarChart3, Boxes, Building2, ClipboardList, Shield, TriangleAlert, Warehouse } from "lucide-react";
 
 import { LogoutButton } from "@/features/auth/logout-button";
 import type { AuthUser } from "@/server/auth";
@@ -8,6 +8,7 @@ const navigation = [
   { href: "/admin", label: "Dashboard", icon: BarChart3 },
   { href: "/admin/articles", label: "Artikel", icon: Boxes },
   { href: "/admin/inventory", label: "Bestand", icon: Warehouse },
+  { href: "/admin/orders", label: "Bestellungen", icon: ClipboardList },
   { href: "/admin/movements", label: "Bewegungen", icon: BarChart3 },
   { href: "/admin/warnings", label: "Warnungen", icon: TriangleAlert },
   { href: "/admin/locations", label: "Standorte", icon: Building2 },

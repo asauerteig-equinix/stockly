@@ -22,12 +22,28 @@ export const articleSchema = z.object({
   name: z.string().min(2),
   barcode: z.string().min(3),
   additionalBarcodes: z.array(z.string().min(3)).optional().default([]),
+  imageUrl: z.string().max(500).optional().nullable(),
   description: z.string().max(500).optional().nullable(),
   manufacturerNumber: z.string().max(120).optional().nullable(),
   supplierNumber: z.string().max(120).optional().nullable(),
   category: z.string().min(2),
+  sortOrder: z.coerce.number().int().min(0).default(0),
   minimumStock: z.coerce.number().int().min(0),
   isArchived: z.coerce.boolean().optional().default(false)
+});
+
+export const purchaseOrderDraftItemsSchema = z.object({
+  locationId: z.string().min(1),
+  articleIds: z.array(z.string().min(1)).min(1),
+  mode: z.enum(["single", "low-stock"]).optional().default("single")
+});
+
+export const purchaseOrderItemUpdateSchema = z.object({
+  quantity: z.coerce.number().int().min(1)
+});
+
+export const purchaseOrderSubmitSchema = z.object({
+  note: z.string().max(500).optional().nullable()
 });
 
 export const goodsReceiptSchema = z.object({
