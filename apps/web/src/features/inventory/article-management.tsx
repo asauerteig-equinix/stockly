@@ -613,15 +613,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
             </div>
 
             {selectedArticle ? (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-                <div className="rounded-2xl bg-secondary/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Bild</p>
-                  <img
-                    src={getArticleImageSrc(selectedArticle.imageUrl)}
-                    alt={selectedArticle.name}
-                    className="mt-3 h-20 w-full rounded-2xl border border-white bg-white object-cover"
-                  />
-                </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-secondary/70 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Standort</p>
                   <p className="mt-1 text-base font-semibold text-slate-950">{selectedArticle.locationName}</p>
@@ -674,7 +666,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                       <div
                         role="button"
                         tabIndex={0}
-                        className="w-full rounded-2xl border border-border/70 bg-white/90 p-4 text-left transition hover:border-primary/30 hover:bg-white"
+                        className="mx-auto w-full max-w-[34rem] rounded-2xl border border-border/70 bg-white/90 p-4 text-left transition hover:border-primary/30 hover:bg-white"
                         onClick={() => setImagePickerOpen(true)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
@@ -683,11 +675,13 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                           }
                         }}
                       >
-                        <img
-                          src={getArticleImageSrc(selectedImageUrl)}
-                          alt="Vorschau des gewaehlten Artikelbildes"
-                          className="h-36 w-full rounded-2xl border border-slate-200 bg-white object-cover"
-                        />
+                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                          <img
+                            src={getArticleImageSrc(selectedImageUrl)}
+                            alt="Vorschau des gewaehlten Artikelbildes"
+                            className="aspect-[16/10] w-full object-cover"
+                          />
+                        </div>
                         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                           <div>
                             <p className="text-sm font-medium text-slate-950">

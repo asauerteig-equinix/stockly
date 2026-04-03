@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { PageIntro } from "@/components/layout/page-intro";
 import { buttonVariants } from "@/components/ui/button";
 import { OrderEmailPreview } from "@/features/orders/order-email-preview";
+import { type OrderEmailPayload } from "@/lib/order-email";
 import { requireUser } from "@/server/auth";
-import { buildPurchaseOrderEmailPreview, getPurchaseOrderForUser } from "@/server/order-documents";
+import { getPurchaseOrderForUser } from "@/server/order-documents";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -20,13 +21,22 @@ export default async function OrderEmailPreviewPage({ params }: PageProps) {
     notFound();
   }
 
-  const preview = buildPurchaseOrderEmailPreview(order);
+  const emailOrder: OrderEmailPayload = {
+    orderNumber: order.orderNumber,
+    items: order.items.map((item) => ({
+      articleName: item.articleNameSnapshot,
+      productName: item.articleNameSnapshot,
+      productNumber: item.manufacturerNumberSnapshot ?? "",
+      supplierProductNumber: item.supplierNumberSnapshot ?? "",
+      quantity: item.quantity
+    }))
+  };
 
   return (
     <div className="space-y-8">
       <PageIntro
         title={`E-Mail ${order.orderNumber}`}
-        description="Vorschau fuer die Weitergabe der Bestellung per E-Mail oder Mail-Programm."
+        description="Vorgefertigte Angebotsanfrage mit Sprach- und Firmenumschaltung."
       />
 
       <div className="flex flex-wrap gap-3">
@@ -38,7 +48,7 @@ export default async function OrderEmailPreviewPage({ params }: PageProps) {
         </Link>
       </div>
 
-      <OrderEmailPreview subject={preview.subject} body={preview.body} mailtoHref={preview.mailtoHref} />
+      <OrderEmailPreview order={emailOrder} currentDateIso={new Date().toISOString()} />
     </div>
   );
 }
