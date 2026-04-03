@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Download, FileUp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormFeedback } from "@/components/ui/form-feedback";
 import { Input } from "@/components/ui/input";
 import { articleImportTemplateHeaders } from "@/lib/article-import-template";
@@ -69,34 +68,33 @@ export function ArticleImportTools() {
   }
 
   return (
-    <Card className="border-white/80 bg-white/95 shadow-sm">
-      <CardHeader className="gap-3">
-        <CardTitle>Artikel importieren</CardTitle>
-        <CardDescription>
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <h3 className="text-lg font-semibold text-slate-950">Artikel importieren</h3>
+        <p className="text-sm text-slate-500">
           Neue oder geaenderte Artikel koennen gesammelt aus `xlsx`, `xls` oder `csv` uebernommen werden.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <FormFeedback message={feedback.message} tone={feedback.tone} />
+        </p>
+      </div>
 
-        <div className="space-y-2">
-          <Input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" />
-          <p className="text-xs text-slate-500">
-            Pflichtfelder: Standort Code oder Standort, Kategorie, Artikelname und Barcode.
-          </p>
-        </div>
+      <FormFeedback message={feedback.message} tone={feedback.tone} />
 
-        <div className="flex flex-wrap gap-3">
-          <Button onClick={handleImport} disabled={isPending}>
-            <FileUp className="mr-2 h-4 w-4" />
-            {isPending ? "Importiert..." : "Import starten"}
-          </Button>
-          <Button variant="outline" onClick={downloadTemplate}>
-            <Download className="mr-2 h-4 w-4" />
-            Vorlage laden
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      <div className="space-y-2">
+        <Input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" />
+        <p className="text-xs text-slate-500">
+          Pflichtfelder: Standort Code oder Standort, Kategorie, Artikelname und Barcode.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <Button onClick={handleImport} disabled={isPending}>
+          <FileUp className="mr-2 h-4 w-4" />
+          {isPending ? "Importiert..." : "Import starten"}
+        </Button>
+        <Button variant="outline" onClick={downloadTemplate}>
+          <Download className="mr-2 h-4 w-4" />
+          Vorlage laden
+        </Button>
+      </div>
+    </div>
   );
 }

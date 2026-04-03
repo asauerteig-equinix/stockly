@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Archive, Boxes, MapPin, Plus, Search, Sparkles, Trash2, TriangleAlert } from "lucide-react";
+import { Archive, Boxes, FileUp, ImagePlus, Images, MapPin, Plus, Search, Sparkles, Trash2, TriangleAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -13,9 +13,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FormFeedback } from "@/components/ui/form-feedback";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { ArticleImagePickerModal } from "@/features/inventory/article-image-picker-modal";
 import { ArticleImportTools } from "@/features/inventory/article-import-tools";
 import { ArticleMediaTools } from "@/features/inventory/article-media-tools";
 import { articlePlaceholderImage } from "@/lib/article-images";
@@ -136,6 +138,9 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [isImportModalOpen, setImportModalOpen] = useState(false);
+  const [isMediaModalOpen, setMediaModalOpen] = useState(false);
+  const [isImagePickerOpen, setImagePickerOpen] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string | null }>({
     tone: "success",
     message: null
@@ -153,6 +158,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
   });
   const currentLocationId = form.watch("locationId");
   const selectedImageUrl = form.watch("imageUrl");
+  const defaultFormLocationId = locationFilter !== "all" ? locationFilter : locations[0]?.id ?? "";
 
   useEffect(() => {
     if (selectedArticle) {
@@ -174,8 +180,8 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
       return;
     }
 
-    form.reset(emptyValues(locationFilter !== "all" ? locationFilter : locations[0]?.id ?? ""));
-  }, [form, locationFilter, locations, selectedArticle]);
+    form.reset(emptyValues(defaultFormLocationId));
+  }, [defaultFormLocationId, form, selectedArticle]);
 
   const categories = useMemo(
     () => Array.from(new Set(articles.map((article) => article.category.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
@@ -253,7 +259,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
 
   function startNewArticle() {
     setSelectedArticleId(null);
-    form.reset(emptyValues(locationFilter !== "all" ? locationFilter : locations[0]?.id ?? ""));
+    form.reset(emptyValues(defaultFormLocationId));
     focusFormWorkspace();
   }
 
@@ -297,7 +303,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
         });
         if (selectedArticleId === article.id) {
           setSelectedArticleId(null);
-          form.reset(emptyValues(locationFilter !== "all" ? locationFilter : locations[0]?.id ?? ""));
+          form.reset(emptyValues(defaultFormLocationId));
         }
         router.refresh();
       } catch (error) {
@@ -338,13 +344,35 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <ArticleImportTools />
-        <ArticleMediaTools images={images} />
-      </div>
+      <Card className="border-white/80 bg-white/95 shadow-sm">
+        <CardContent className="flex flex-col gap-4 p-5 xl:flex-row xl:items-center xl:justify-between">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-slate-950">Werkzeuge kompakt halten</p>
+            <p className="text-sm text-slate-500">
+              Import und Bildbibliothek liegen jetzt bewusst in Modals, damit die Artikelpflege auf der Seite selbst ruhiger und schneller bleibt.
+            </p>
+          </div>
 
-      <div ref={formCardRef}>
-        <Card className="border-white/80 bg-white/95 shadow-sm">
+          <div className="flex flex-wrap gap-3">
+            <Button type="button" variant="outline" onClick={() => setImportModalOpen(true)}>
+              <FileUp className="mr-2 h-4 w-4" />
+              Artikel importieren
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setMediaModalOpen(true)}>
+              <Images className="mr-2 h-4 w-4" />
+              Bildbibliothek
+            </Button>
+            <Button onClick={startNewArticle}>
+              <Plus className="mr-2 h-4 w-4" />
+              Neuer Artikel
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.12fr)_minmax(420px,0.88fr)]">
+        <div ref={formCardRef} className="order-2 2xl:order-2">
+          <Card className="border-white/80 bg-white/95 shadow-sm 2xl:sticky 2xl:top-6">
           <CardHeader className="gap-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="space-y-2">
@@ -433,7 +461,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
             ) : null}
           </CardHeader>
 
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-5 2xl:max-h-[calc(100vh-15rem)] 2xl:overflow-auto 2xl:pr-2">
             <FormFeedback message={feedback.message} tone={feedback.tone} />
 
             <form className="space-y-5" onSubmit={onSubmit}>
@@ -447,16 +475,75 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                     <p className="text-sm text-slate-500">Name, Bild, Hauptbarcode, Zusatz-Barcodes, Standort und Kategorie bilden die Basis fuer Suche, Scanner, Bestellung und Kiosk.</p>
                   </div>
 
-                  <div className="rounded-2xl border border-border/70 bg-white/90 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Aktuelles Artikelbild</p>
-                    <img
-                      src={getArticleImageSrc(selectedImageUrl)}
-                      alt="Vorschau des gewaehlten Artikelbildes"
-                      className="mt-3 h-36 w-full rounded-2xl border border-slate-200 bg-white object-cover"
-                    />
-                  </div>
-
                   <div className="grid gap-4 xl:grid-cols-2">
+                    <div className="space-y-3 xl:col-span-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <Label>Bild</Label>
+                          <p className="text-xs text-slate-500">Ein Klick auf das Bild oeffnet die Auswahl als Modal.</p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="button" size="sm" variant="outline" onClick={() => setImagePickerOpen(true)}>
+                            <ImagePlus className="mr-2 h-4 w-4" />
+                            Bild waehlen
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              form.setValue("imageUrl", articlePlaceholderImage, {
+                                shouldDirty: true,
+                                shouldValidate: true
+                              })
+                            }
+                          >
+                            Platzhalter
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className="w-full rounded-2xl border border-border/70 bg-white/90 p-4 text-left transition hover:border-primary/30 hover:bg-white"
+                        onClick={() => setImagePickerOpen(true)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setImagePickerOpen(true);
+                          }
+                        }}
+                      >
+                        <img
+                          src={getArticleImageSrc(selectedImageUrl)}
+                          alt="Vorschau des gewaehlten Artikelbildes"
+                          className="h-36 w-full rounded-2xl border border-slate-200 bg-white object-cover"
+                        />
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-slate-950">
+                              {selectedImageUrl === articlePlaceholderImage ? "Platzhalter aktiv" : "Bild ausgewaehlt"}
+                            </p>
+                            <p className="text-xs text-slate-500">Zum Aendern einfach antippen oder anklicken.</p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setMediaModalOpen(true);
+                            }}
+                          >
+                            <Images className="mr-2 h-4 w-4" />
+                            Bibliothek
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="space-y-2 xl:col-span-2">
                       <Label htmlFor="name">Artikelname</Label>
                       <Input id="name" placeholder="z. B. SFP Modul 10G Single-Mode" {...form.register("name")} />
@@ -479,24 +566,6 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                         ))}
                       </Select>
                       <FieldError message={form.formState.errors.locationId?.message} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="imageUrl">Bild</Label>
-                      <Select id="imageUrl" {...form.register("imageUrl")}>
-                        <option value={articlePlaceholderImage}>Platzhalter verwenden</option>
-                        {selectedImageUrl &&
-                        selectedImageUrl !== articlePlaceholderImage &&
-                        !images.some((image) => image.url === selectedImageUrl) ? (
-                          <option value={selectedImageUrl}>Aktuelle externe Bild-URL</option>
-                        ) : null}
-                        {images.map((image) => (
-                          <option key={image.fileName} value={image.url}>
-                            {image.name}
-                          </option>
-                        ))}
-                      </Select>
-                      <p className="text-xs text-slate-500">Bilder lassen sich oben in der Bildbibliothek hochladen.</p>
                     </div>
 
                     <div className="space-y-2 xl:col-span-2">
@@ -639,7 +708,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                     variant="ghost"
                     onClick={() => {
                       setSelectedArticleId(null);
-                      form.reset(emptyValues(locationFilter !== "all" ? locationFilter : locations[0]?.id ?? ""));
+                      form.reset(emptyValues(defaultFormLocationId));
                     }}
                   >
                     Bearbeitung verlassen
@@ -654,16 +723,16 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
               </datalist>
             </form>
           </CardContent>
-        </Card>
-      </div>
+          </Card>
+        </div>
 
-      <Card className="border-white/80 bg-white/90 shadow-sm">
+        <Card className="order-1 border-white/80 bg-white/90 shadow-sm 2xl:order-1">
         <CardHeader className="gap-4">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-2">
               <CardTitle>Artikelbestand und Pflege</CardTitle>
               <CardDescription>
-                Suche, Filter und Direktwahl in einer grossen Arbeitsflaeche. Ein Klick auf einen Eintrag springt zur Bearbeitung oben.
+                Die verfuegbaren Artikel stehen bewusst frueher im Fokus. Ein Klick auf einen Eintrag oeffnet ihn direkt rechts oder darunter zur Bearbeitung.
               </CardDescription>
             </div>
 
@@ -720,10 +789,10 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+          <CardContent className="space-y-4">
           {filteredArticles.length ? (
             <div className="overflow-hidden rounded-xl border border-border">
-              <div className="max-h-[calc(100vh-24rem)] overflow-auto">
+              <div className="max-h-[min(70vh,54rem)] overflow-auto 2xl:max-h-[calc(100vh-18rem)]">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -833,7 +902,44 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
             </div>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      </div>
+
+      <Modal
+        open={isImportModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        title="Artikel importieren"
+        description="Importe liegen bewusst ausserhalb der Hauptseite, damit die Artikelliste schnell sichtbar bleibt."
+      >
+        <ArticleImportTools />
+      </Modal>
+
+      <Modal
+        open={isMediaModalOpen}
+        onClose={() => setMediaModalOpen(false)}
+        title="Bildbibliothek"
+        description="Bilder werden zentral hochgeladen, geloescht und danach ueberall wiederverwendet."
+        className="max-w-6xl"
+      >
+        <ArticleMediaTools images={images} />
+      </Modal>
+
+      <ArticleImagePickerModal
+        open={isImagePickerOpen}
+        onClose={() => setImagePickerOpen(false)}
+        images={images}
+        selectedImageUrl={selectedImageUrl}
+        onSelect={(imageUrl) =>
+          form.setValue("imageUrl", imageUrl, {
+            shouldDirty: true,
+            shouldValidate: true
+          })
+        }
+        onOpenLibrary={() => {
+          setImagePickerOpen(false);
+          setMediaModalOpen(true);
+        }}
+      />
     </div>
   );
 }

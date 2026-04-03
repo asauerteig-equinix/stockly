@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { ImagePlus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormFeedback } from "@/components/ui/form-feedback";
 import { Input } from "@/components/ui/input";
 import { withBasePath } from "@/lib/base-path";
@@ -86,53 +85,54 @@ export function ArticleMediaTools({ images }: { images: ArticleImageOption[] }) 
   }
 
   return (
-    <Card className="border-white/80 bg-white/95 shadow-sm">
-      <CardHeader className="gap-3">
-        <CardTitle>Bildbibliothek</CardTitle>
-        <CardDescription>
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <h3 className="text-lg font-semibold text-slate-950">Bildbibliothek</h3>
+        <p className="text-sm text-slate-500">
           Hochgeladene Artikelbilder koennen danach in der Artikelpflege, in Bestellungen und spaeter auch im Kiosk verwendet werden.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <FormFeedback message={feedback.message} tone={feedback.tone} />
+        </p>
+      </div>
 
-        <div className="flex flex-wrap gap-3">
-          <Input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" />
-          <Button onClick={handleUpload} disabled={isPending}>
-            <ImagePlus className="mr-2 h-4 w-4" />
-            {isPending ? "Laeuft..." : "Bild hochladen"}
-          </Button>
-        </div>
+      <FormFeedback message={feedback.message} tone={feedback.tone} />
 
-        {images.length ? (
-          <div className="grid max-h-[16rem] gap-3 overflow-auto pr-1 sm:grid-cols-2">
-            {images.map((image) => (
-              <div key={image.fileName} className="rounded-2xl border border-border bg-slate-50/80 p-3">
-                <img
-                  src={withBasePath(image.url)}
-                  alt={image.name}
-                  className="h-28 w-full rounded-xl border border-white bg-white object-cover"
-                />
-                <div className="mt-3 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-900" title={image.name}>
-                      {image.name}
-                    </p>
-                    <p className="text-xs text-slate-500">{image.fileName}</p>
-                  </div>
-                  <Button size="sm" variant="ghost" onClick={() => handleDelete(image.fileName)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+      <div className="flex flex-wrap gap-3">
+        <Input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" />
+        <Button onClick={handleUpload} disabled={isPending}>
+          <ImagePlus className="mr-2 h-4 w-4" />
+          {isPending ? "Laeuft..." : "Bild hochladen"}
+        </Button>
+      </div>
+
+      {images.length ? (
+        <div className="grid max-h-[32rem] gap-3 overflow-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
+          {images.map((image) => (
+            <div key={image.fileName} className="rounded-2xl border border-border bg-slate-50/80 p-3">
+              <img
+                src={withBasePath(image.url)}
+                alt={image.name}
+                className="h-32 w-full rounded-xl border border-white bg-white object-cover"
+              />
+              <div className="mt-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-900" title={image.name}>
+                    {image.name}
+                  </p>
+                  <p className="truncate text-xs text-slate-500" title={image.fileName}>
+                    {image.fileName}
+                  </p>
                 </div>
+                <Button size="sm" variant="ghost" onClick={() => handleDelete(image.fileName)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-border bg-slate-50/80 px-6 py-8 text-center text-sm text-slate-500">
-            Noch keine Bilder in der Bibliothek.
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-border bg-slate-50/80 px-6 py-8 text-center text-sm text-slate-500">
+          Noch keine Bilder in der Bibliothek.
+        </div>
+      )}
+    </div>
   );
 }
