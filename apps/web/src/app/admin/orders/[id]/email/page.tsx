@@ -43,9 +43,6 @@ export default async function OrderEmailPreviewPage({ params }: PageProps) {
         <Link href="/admin/orders" className={buttonVariants({ variant: "outline" })}>
           Zurueck zu Bestellungen
         </Link>
-        <Link href={`/admin/orders/${order.id}`} className={buttonVariants({ variant: "outline" })}>
-          Zurueck zur Bestellung
-        </Link>
       </div>
 
       <OrderEmailPreview order={emailOrder} currentDateIso={new Date().toISOString()} />

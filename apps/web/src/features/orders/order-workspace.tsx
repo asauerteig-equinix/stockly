@@ -158,6 +158,7 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
   }, [activeDraft?.id, activeDraft?.note]);
 
   const totalDraftQuantity = activeDraft?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+  const activeDraftItemCount = activeDraft?.items.length ?? 0;
 
   async function addArticles(articleIds: string[]) {
     if (!selectedLocationId || articleIds.length === 0) {
@@ -302,13 +303,6 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
 
       <Card className="border-white/80 bg-white/95">
         <CardHeader className="gap-4">
-          <div className="space-y-2">
-            <CardTitle>Nachbestellungen direkt aus dem Lageralltag</CardTitle>
-            <CardDescription>
-              Low-Stock-Artikel uebernehmen, weitere Artikel nach Kategorie dazuklicken und pro Standort als Bestellung abschliessen.
-            </CardDescription>
-          </div>
-
           <div className="flex flex-wrap gap-3">
             {locations.map((location) => (
               <Button
@@ -338,9 +332,11 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
             </div>
             <div className="rounded-2xl bg-secondary/60 px-4 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Entwurf</p>
-              <p className="mt-1 text-3xl font-semibold text-slate-950">{formatQuantity(totalDraftQuantity)}</p>
+              <p className="mt-1 text-3xl font-semibold text-slate-950">{activeDraft ? "Aktiv" : "Keiner"}</p>
               <p className="mt-1 text-sm text-slate-600">
-                {activeDraft ? `${activeDraft.items.length} Positionen in ${activeDraft.orderNumber}` : "Noch kein Entwurf fuer diesen Standort."}
+                {activeDraft
+                  ? `Automatisch gespeichert / ${formatQuantity(activeDraftItemCount)} Positionen in ${activeDraft.orderNumber}`
+                  : "Noch kein offener Entwurf fuer diesen Standort."}
               </p>
             </div>
           </div>

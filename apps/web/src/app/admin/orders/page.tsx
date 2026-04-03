@@ -1,4 +1,3 @@
-import { PageIntro } from "@/components/layout/page-intro";
 import { OrderWorkspace } from "@/features/orders/order-workspace";
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
@@ -94,11 +93,6 @@ export default async function OrdersPage() {
 
   return (
     <div className="space-y-8">
-      <PageIntro
-        title="Bestellungen"
-        description="Nachbestellungen lassen sich direkt aus Low-Stock-Warnungen und ueber die manuelle Artikelauswahl pro Standort zusammenstellen."
-      />
-
       <OrderWorkspace
         locations={locations.map((location) => ({
           id: location.id,

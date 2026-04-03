@@ -1,7 +1,7 @@
 import { prisma } from "@/server/db";
 
 function pad(num: number) {
-  return num.toString().padStart(4, "0");
+  return num.toString().padStart(3, "0");
 }
 
 export async function generateOrderNumber() {
@@ -10,7 +10,7 @@ export async function generateOrderNumber() {
   const mm = `${now.getMonth() + 1}`.padStart(2, "0");
   const dd = `${now.getDate()}`.padStart(2, "0");
   const datePart = `${yyyy}${mm}${dd}`;
-  const prefix = `PO-${datePart}-`;
+  const prefix = `${datePart}-`;
 
   const latestOrder = await prisma.purchaseOrder.findFirst({
     where: {
