@@ -6,8 +6,11 @@ import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 
 import { Button } from "@/components/ui/button";
 
+import { playKioskTone, primeKioskAudio } from "./kiosk-audio";
+
 type BarcodeScannerProps = {
   onDetected: (barcode: string) => boolean | Promise<boolean>;
+  compact?: boolean;
 };
 
 const SCAN_ZONE_WIDTH_RATIO = 0.74;
@@ -60,10 +63,9 @@ function isPlausibleBarcodeCandidate(value: string) {
   return new Set(value).size > 1;
 }
 
-export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
+export function BarcodeScanner({ onDetected, compact = false }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
   const onDetectedRef = useRef(onDetected);
   const autoStopTimeoutRef = useRef<number | null>(null);
   const countdownIntervalRef = useRef<number | null>(null);
@@ -85,57 +87,6 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
     };
   }, []);
 
-  async function ensureAudioContext() {
-    if (typeof window === "undefined" || !window.AudioContext) {
-      return null;
-    }
-
-    const audioContext = audioContextRef.current ?? new window.AudioContext();
-    audioContextRef.current = audioContext;
-
-    if (audioContext.state === "suspended") {
-      try {
-        await audioContext.resume();
-      } catch {
-        return audioContext;
-      }
-    }
-
-    return audioContext;
-  }
-
-  function playFeedbackTone(type: "success" | "error") {
-    const audioContext = audioContextRef.current;
-
-    if (!audioContext || audioContext.state !== "running") {
-      return;
-    }
-
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    const startAt = audioContext.currentTime;
-
-    oscillator.type = type === "success" ? "sine" : "triangle";
-
-    if (type === "success") {
-      oscillator.frequency.setValueAtTime(880, startAt);
-      oscillator.frequency.exponentialRampToValueAtTime(1320, startAt + 0.08);
-    } else {
-      oscillator.frequency.setValueAtTime(440, startAt);
-      oscillator.frequency.exponentialRampToValueAtTime(220, startAt + 0.14);
-    }
-
-    gainNode.gain.setValueAtTime(0.0001, startAt);
-    gainNode.gain.exponentialRampToValueAtTime(type === "success" ? 0.12 : 0.08, startAt + 0.01);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + (type === "success" ? 0.18 : 0.22));
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-
-    oscillator.start(startAt);
-    oscillator.stop(startAt + (type === "success" ? 0.18 : 0.22));
-  }
-
   function clearScanWindowTimers() {
     if (autoStopTimeoutRef.current) {
       clearTimeout(autoStopTimeoutRef.current);
@@ -155,7 +106,7 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
   }
 
   async function startTimedScan() {
-    await ensureAudioContext();
+    await primeKioskAudio();
 
     lastDetectedRef.current = { barcode: "", timestamp: 0 };
     setError(null);
@@ -274,10 +225,10 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
 
       try {
         const wasMatched = await Promise.resolve(onDetectedRef.current(normalizedBarcode));
-        playFeedbackTone(wasMatched ? "success" : "error");
+        playKioskTone(wasMatched ? "scan-success" : "scan-error");
         setError(null);
       } catch {
-        playFeedbackTone("error");
+        playKioskTone("scan-error");
         setError("Erkannter Barcode konnte nicht verarbeitet werden.");
       }
     }
@@ -367,11 +318,13 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
   }, [active]);
 
   return (
-    <div className="space-y-3 rounded-3xl border border-white/10 bg-slate-950/70 p-4">
+    <div className={compact ? "space-y-3" : "space-y-3 rounded-3xl border border-white/10 bg-slate-950/70 p-4"}>
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="font-medium text-white">Live-Scanner</p>
-          <p className="text-sm text-slate-400">Scan startet bewusst per Klick auf die Flaeche und stoppt nach 10 Sekunden automatisch.</p>
+          {!compact ? (
+            <p className="text-sm text-slate-400">Scan startet bewusst per Klick auf die Flaeche und stoppt nach 10 Sekunden automatisch.</p>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           {active ? (
@@ -425,15 +378,17 @@ export function BarcodeScanner({ onDetected }: BarcodeScannerProps) {
         </div>
       </button>
 
-      {active ? (
-        <p className="text-sm text-cyan-200">
-          Scanner aktiv. Gelesen wird nur im markierten Mittelbereich und danach automatisch wieder gestoppt.
-        </p>
-      ) : (
-        <p className="text-sm text-slate-400">
-          Kein Dauer-Scan mehr. Die Kamera wertet erst nach einem bewussten Klick auf die Scanflaeche aus.
-        </p>
-      )}
+      {!compact ? (
+        active ? (
+          <p className="text-sm text-cyan-200">
+            Scanner aktiv. Gelesen wird nur im markierten Mittelbereich und danach automatisch wieder gestoppt.
+          </p>
+        ) : (
+          <p className="text-sm text-slate-400">
+            Kein Dauer-Scan mehr. Die Kamera wertet erst nach einem bewussten Klick auf die Scanflaeche aus.
+          </p>
+        )
+      ) : null}
       {error ? <p className="rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">{error}</p> : null}
     </div>
   );
