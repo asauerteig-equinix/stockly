@@ -15,9 +15,19 @@ type ModalProps = {
   children: React.ReactNode;
   className?: string;
   contentClassName?: string;
+  headerActions?: React.ReactNode;
 };
 
-export function Modal({ open, onClose, title, description, children, className, contentClassName }: ModalProps) {
+export function Modal({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  className,
+  contentClassName,
+  headerActions
+}: ModalProps) {
   useEffect(() => {
     if (!open) {
       return;
@@ -61,9 +71,12 @@ export function Modal({ open, onClose, title, description, children, className, 
             {description ? <p className="text-sm text-slate-500">{description}</p> : null}
           </div>
 
-          <Button type="button" variant="ghost" className="h-10 w-10 p-0" onClick={onClose} aria-label="Modal schliessen">
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="flex items-start gap-2">
+            {headerActions}
+            <Button type="button" variant="ghost" className="h-10 w-10 p-0" onClick={onClose} aria-label="Modal schliessen">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         <div className={cn("max-h-[min(82vh,60rem)] overflow-auto px-6 py-5", contentClassName)}>{children}</div>

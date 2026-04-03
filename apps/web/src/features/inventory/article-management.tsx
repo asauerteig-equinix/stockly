@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Archive, Boxes, FileUp, Images, MapPin, Plus, Search, Sparkles, Trash2, TriangleAlert } from "lucide-react";
+import { Archive, Boxes, FileUp, Images, MapPin, Plus, Search, Trash2, TriangleAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -156,6 +156,7 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
     resolver: zodResolver(articleFormSchema),
     defaultValues: emptyValues(locations[0]?.id ?? "")
   });
+  const articleFormId = "article-editor-form";
   const currentLocationId = form.watch("locationId");
   const selectedImageUrl = form.watch("imageUrl");
   const defaultFormLocationId = locationFilter !== "all" ? locationFilter : locations[0]?.id ?? "";
@@ -557,62 +558,44 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
         open={isEditorOpen}
         onClose={closeEditor}
         title={selectedArticle ? `Artikel bearbeiten` : "Neuer Artikel"}
-        description="Die Bearbeitung laeuft jetzt bewusst als grosses Modal, damit die Artikelliste auf der Seite selbst voll sichtbar bleibt."
         className="max-w-[min(96vw,92rem)]"
         contentClassName="max-h-[calc(100vh-8rem)] px-0 py-0"
+        headerActions={
+          <>
+            {selectedArticle ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isPending}
+                onClick={() => {
+                  void toggleArchive(selectedArticle);
+                }}
+              >
+                {selectedArticle.isArchived ? "Artikel reaktivieren" : "Artikel archivieren"}
+              </Button>
+            ) : null}
+            {selectedArticle ? (
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={isPending}
+                onClick={() => {
+                  void deleteArticle(selectedArticle);
+                }}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Artikel loeschen
+              </Button>
+            ) : null}
+            <Button type="submit" form={articleFormId} disabled={isPending}>
+              {isPending ? "Speichert..." : selectedArticle ? "Aenderungen speichern" : "Artikel anlegen"}
+            </Button>
+          </>
+        }
       >
         <Card className="border-none bg-transparent shadow-none">
-          <CardHeader className="gap-5">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="border border-primary/10 bg-primary/10 text-primary">
-                    {selectedArticle ? "Bearbeitungsmodus" : "Schnellerfassung"}
-                  </Badge>
-                  {selectedLocation ? (
-                    <Badge variant="muted">
-                      Standort {selectedLocation.name} ({selectedLocation.code})
-                    </Badge>
-                  ) : null}
-                </div>
-                <CardTitle>{selectedArticle ? `Artikel bearbeiten: ${selectedArticle.name}` : "Artikel schnell und sauber anlegen"}</CardTitle>
-                <CardDescription>
-                  Die wichtigsten Felder stehen jetzt direkt im Fokus. Zusatzinfos bleiben sichtbar, aber nicht mehr im Weg.
-                </CardDescription>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button onClick={startNewArticle}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Neuer Artikel
-                </Button>
-                {selectedArticle ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      void toggleArchive(selectedArticle);
-                    }}
-                  >
-                    {selectedArticle.isArchived ? "Artikel reaktivieren" : "Artikel archivieren"}
-                  </Button>
-                ) : null}
-                {selectedArticle ? (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => {
-                      void deleteArticle(selectedArticle);
-                    }}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Artikel loeschen
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-
-            {selectedArticle ? (
+          {selectedArticle ? (
+            <CardHeader className="px-6 pb-0 pt-6">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-secondary/70 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Standort</p>
@@ -632,151 +615,124 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                     {selectedArticle.isArchived ? "Archiviert" : isLowStock(selectedArticle) ? "Aufmerksamkeit" : "Aktiv"}
                   </p>
                 </div>
-                <div className="rounded-2xl bg-secondary/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Zusatz-Barcodes</p>
-                  <p className="mt-1 text-base font-semibold text-slate-950">
-                    {formatQuantity(selectedArticle.additionalBarcodes.length)}
-                  </p>
-                </div>
               </div>
-            ) : null}
-          </CardHeader>
+            </CardHeader>
+          ) : null}
 
-          <CardContent className="space-y-5 2xl:max-h-[calc(100vh-15rem)] 2xl:overflow-auto 2xl:pr-2">
+          <CardContent className={cn("space-y-5 px-6 pb-6", selectedArticle ? "pt-5" : "pt-6")}>
             <FormFeedback message={feedback.message} tone={feedback.tone} />
 
-            <form className="space-y-5" onSubmit={onSubmit}>
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_380px]">
-                <section className="space-y-4 rounded-2xl border border-border/70 bg-slate-50/80 p-5">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-slate-900">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      <h3 className="text-sm font-semibold">Stammdaten</h3>
-                    </div>
-                    <p className="text-sm text-slate-500">Name, Bild, Hauptbarcode, Zusatz-Barcodes, Standort und Kategorie bilden die Basis fuer Suche, Scanner, Bestellung und Kiosk.</p>
-                  </div>
+            <form id={articleFormId} className="space-y-5" onSubmit={onSubmit}>
+              <section className="space-y-4 rounded-2xl border border-border/70 bg-slate-50/80 p-5">
+                <div className="space-y-2">
+                  <Label htmlFor="locationId">Standort</Label>
+                  <Select id="locationId" {...form.register("locationId")}>
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name} ({location.code})
+                      </option>
+                    ))}
+                  </Select>
+                  <FieldError message={form.formState.errors.locationId?.message} />
+                </div>
 
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    <div className="space-y-3 xl:col-span-2">
-                      <div>
-                        <Label>Bild</Label>
-                        <p className="text-xs text-slate-500">Ein Klick auf das Bild oeffnet die Auswahl als Modal.</p>
-                      </div>
+                <div className="space-y-3">
+                  <Label>Bild</Label>
 
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        className="mx-auto w-full max-w-[34rem] rounded-2xl border border-border/70 bg-white/90 p-4 text-left transition hover:border-primary/30 hover:bg-white"
-                        onClick={() => setImagePickerOpen(true)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setImagePickerOpen(true);
-                          }
-                        }}
-                      >
-                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                          <img
-                            src={getArticleImageSrc(selectedImageUrl)}
-                            alt="Vorschau des gewaehlten Artikelbildes"
-                            className="aspect-[16/10] w-full object-cover"
-                          />
-                        </div>
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-medium text-slate-950">
-                              {selectedImageUrl === articlePlaceholderImage ? "Platzhalter aktiv" : "Bild ausgewaehlt"}
-                            </p>
-                            <p className="text-xs text-slate-500">Zum Aendern einfach antippen oder anklicken.</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 xl:col-span-2">
-                      <Label htmlFor="name">Artikelname</Label>
-                      <Input id="name" placeholder="z. B. SFP Modul 10G Single-Mode" {...form.register("name")} />
-                      <FieldError message={form.formState.errors.name?.message} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="barcode">Hauptbarcode</Label>
-                      <Input id="barcode" placeholder="Standard-Barcode fuer diesen Artikel" {...form.register("barcode")} />
-                      <FieldError message={form.formState.errors.barcode?.message} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="locationId">Standort</Label>
-                      <Select id="locationId" {...form.register("locationId")}>
-                        {locations.map((location) => (
-                          <option key={location.id} value={location.id}>
-                            {location.name} ({location.code})
-                          </option>
-                        ))}
-                      </Select>
-                      <FieldError message={form.formState.errors.locationId?.message} />
-                    </div>
-
-                    <div className="space-y-2 xl:col-span-2">
-                      <Label htmlFor="additionalBarcodesInput">Weitere Barcodes</Label>
-                      <Textarea
-                        id="additionalBarcodesInput"
-                        className="min-h-[110px]"
-                        placeholder={"Optional, z. B. ein Barcode pro Zeile\n1234567890123\n998877665544"}
-                        {...form.register("additionalBarcodesInput")}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className="mx-auto w-full max-w-[34rem] rounded-2xl border border-border/70 bg-white/90 p-4 text-left transition hover:border-primary/30 hover:bg-white"
+                    onClick={() => setImagePickerOpen(true)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setImagePickerOpen(true);
+                      }
+                    }}
+                  >
+                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                      <img
+                        src={getArticleImageSrc(selectedImageUrl)}
+                        alt="Vorschau des gewaehlten Artikelbildes"
+                        className="aspect-[16/10] w-full object-cover"
                       />
-                      <p className="text-xs text-slate-500">
-                        Optional. Sinnvoll, wenn verschiedene Hersteller fuer denselben Artikel unterschiedliche Barcodes nutzen.
+                    </div>
+                    <div className="mt-3">
+                      <p className="text-sm font-medium text-slate-950">
+                        {selectedImageUrl === articlePlaceholderImage ? "Platzhalter aktiv" : "Bild ausgewaehlt"}
                       </p>
                     </div>
-
-                    <div className="space-y-2 xl:col-span-2">
-                      <Label htmlFor="category">Kategorie</Label>
-                      <Input
-                        id="category"
-                        list="article-category-options"
-                        placeholder="Optik, Kabel, Hardware ..."
-                        {...form.register("category")}
-                      />
-                      <FieldError message={form.formState.errors.category?.message} />
-                      {categories.length ? (
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          {categories.slice(0, 10).map((category) => (
-                            <Button
-                              key={category}
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-8 border-white bg-white text-slate-700 hover:bg-slate-100"
-                              onClick={() =>
-                                form.setValue("category", category, {
-                                  shouldDirty: true,
-                                  shouldValidate: true
-                                })
-                              }
-                            >
-                              {category}
-                            </Button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="sortOrder">Reihenfolge</Label>
-                      <Input id="sortOrder" type="number" min={0} {...form.register("sortOrder")} />
-                      <FieldError message={form.formState.errors.sortOrder?.message} />
-                      <p className="text-xs text-slate-500">Steuert die Reihenfolge innerhalb der Kategorie.</p>
-                    </div>
                   </div>
-                </section>
+                </div>
 
-                <section className="space-y-4 rounded-2xl border border-border/70 bg-slate-50/80 p-5">
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-semibold text-slate-900">Lagerregeln</h3>
-                    <p className="text-sm text-slate-500">Hier steuerst du, ab wann der Artikel in Warnungen auftaucht.</p>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <div className="space-y-2 xl:col-span-2">
+                    <Label htmlFor="name">Artikelname</Label>
+                    <Input id="name" placeholder="z. B. SFP Modul 10G Single-Mode" {...form.register("name")} />
+                    <FieldError message={form.formState.errors.name?.message} />
                   </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="barcode">Hauptbarcode</Label>
+                    <Input id="barcode" placeholder="Standard-Barcode fuer diesen Artikel" {...form.register("barcode")} />
+                    <FieldError message={form.formState.errors.barcode?.message} />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-2">
+                    <Label htmlFor="additionalBarcodesInput">Weitere Barcodes</Label>
+                    <Textarea
+                      id="additionalBarcodesInput"
+                      className="min-h-[110px]"
+                      placeholder={"Optional, z. B. ein Barcode pro Zeile\n1234567890123\n998877665544"}
+                      {...form.register("additionalBarcodesInput")}
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-2">
+                    <Label htmlFor="category">Kategorie</Label>
+                    <Input
+                      id="category"
+                      list="article-category-options"
+                      placeholder="Optik, Kabel, Hardware ..."
+                      {...form.register("category")}
+                    />
+                    <FieldError message={form.formState.errors.category?.message} />
+                    {categories.length ? (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {categories.slice(0, 10).map((category) => (
+                          <Button
+                            key={category}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 border-white bg-white text-slate-700 hover:bg-slate-100"
+                            onClick={() =>
+                              form.setValue("category", category, {
+                                shouldDirty: true,
+                                shouldValidate: true
+                              })
+                            }
+                          >
+                            {category}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sortOrder">Reihenfolge</Label>
+                    <Input id="sortOrder" type="number" min={0} {...form.register("sortOrder")} />
+                    <FieldError message={form.formState.errors.sortOrder?.message} />
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-4 rounded-2xl border border-border/70 bg-slate-50/80 p-5">
+                <h3 className="text-sm font-semibold text-slate-900">Lagerregeln</h3>
+
+                <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
                   <div className="space-y-2">
                     <Label htmlFor="minimumStock">Mindestbestand</Label>
                     <Input id="minimumStock" type="number" min={0} {...form.register("minimumStock")} />
@@ -805,21 +761,11 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                       ))}
                     </div>
                   </div>
-
-                  <div className="rounded-2xl bg-white/90 px-4 py-4 text-sm text-slate-600">
-                    <p className="font-medium text-slate-950">Hinweis zum Archivstatus</p>
-                    <p className="mt-1">
-                      Archivieren laesst Historie und Buchungen intakt. Fuer den Alltag ist das meist besser als Loeschen.
-                    </p>
-                  </div>
-                </section>
-              </div>
+                </div>
+              </section>
 
               <section className="space-y-4 rounded-2xl border border-border/70 bg-slate-50/80 p-5">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-semibold text-slate-900">Zusatzinformationen</h3>
-                  <p className="text-sm text-slate-500">Alles, was im Tagesgeschaeft bei Einkauf, Identifikation und Rueckfragen hilft.</p>
-                </div>
+                <h3 className="text-sm font-semibold text-slate-900">Zusatzinformationen</h3>
 
                 <div className="grid gap-4 xl:grid-cols-3">
                   <div className="space-y-2">
@@ -843,24 +789,6 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
                   </div>
                 </div>
               </section>
-
-              <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-1">
-                <Button type="submit" disabled={isPending}>
-                  {isPending ? "Speichert..." : selectedArticle ? "Aenderungen speichern" : "Artikel anlegen"}
-                </Button>
-                <Button type="button" variant="outline" onClick={startNewArticle}>
-                  Formular leeren
-                </Button>
-                {selectedArticle ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={closeEditor}
-                  >
-                    Bearbeitung verlassen
-                  </Button>
-                ) : null}
-              </div>
 
               <datalist id="article-category-options">
                 {categories.map((category) => (
