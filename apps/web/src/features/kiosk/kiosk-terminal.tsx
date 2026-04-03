@@ -51,7 +51,6 @@ type BookingSuccess = {
   balanceQuantity: number;
 };
 
-const ARTICLE_PAGE_SIZE = 8;
 const SUCCESS_STAGE_MS = 1800;
 const IDLE_RESET_MS = 10000;
 const PATCH_PATTERNS = [/\bpatch\b/i, /\bpatchkabel\b/i, /\blc[-/ ]?lc\b/i, /\bsc[-/ ]?sc\b/i, /\bcat\d/i];
@@ -134,6 +133,18 @@ function getActionPastTense(action: "TAKE" | "RETURN") {
   return action === "TAKE" ? "entnommen" : "zurueckgebucht";
 }
 
+function resolveArticlePageSize(width: number, height: number) {
+  if (width >= 1500 && height >= 850) {
+    return 8;
+  }
+
+  if (width >= 1100 && height >= 700) {
+    return 6;
+  }
+
+  return 4;
+}
+
 export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds }: KioskTerminalProps) {
   const router = useRouter();
   const [catalogue, setCatalogue] = useState<ArticleResult[]>(articles);
@@ -141,6 +152,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [articlePage, setArticlePage] = useState(0);
+  const [articlePageSize, setArticlePageSize] = useState(6);
   const [quantity, setQuantity] = useState(1);
   const [usageReason, setUsageReason] = useState(usageReasons[0] ?? "project");
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -164,10 +176,10 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
   const defaultCategory = groupedArticles[0]?.[0] ?? null;
   const activeCategory = selectedCategory ?? defaultCategory;
   const categoryArticles = groupedArticles.find(([category]) => category === activeCategory)?.[1] ?? [];
-  const totalArticlePages = Math.max(1, Math.ceil(categoryArticles.length / ARTICLE_PAGE_SIZE));
+  const totalArticlePages = Math.max(1, Math.ceil(categoryArticles.length / articlePageSize));
   const visibleArticles = categoryArticles.slice(
-    articlePage * ARTICLE_PAGE_SIZE,
-    articlePage * ARTICLE_PAGE_SIZE + ARTICLE_PAGE_SIZE
+    articlePage * articlePageSize,
+    articlePage * articlePageSize + articlePageSize
   );
   const selectedArticle = catalogue.find((article) => article.id === selectedArticleId) ?? null;
 
@@ -176,6 +188,23 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
       setArticlePage(0);
     }
   }, [articlePage, totalArticlePages]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const updatePageSize = () => {
+      setArticlePageSize(resolveArticlePageSize(window.innerWidth, window.innerHeight));
+    };
+
+    updatePageSize();
+    window.addEventListener("resize", updatePageSize);
+
+    return () => {
+      window.removeEventListener("resize", updatePageSize);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -253,7 +282,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
   function resolveArticlePage(category: string, articleId: string) {
     const articlesInCategory = groupedArticles.find(([entryCategory]) => entryCategory === category)?.[1] ?? [];
     const articleIndex = articlesInCategory.findIndex((article) => article.id === articleId);
-    return articleIndex >= 0 ? Math.floor(articleIndex / ARTICLE_PAGE_SIZE) : 0;
+    return articleIndex >= 0 ? Math.floor(articleIndex / articlePageSize) : 0;
   }
 
   function selectByBarcode(detectedBarcode: string) {
@@ -432,8 +461,39 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
       <Card className="flex-1 overflow-hidden border-white/10 bg-slate-950/88 text-white">
         <CardContent className="h-full p-4">
           {step === "categories" ? (
-            <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-              <section className="rounded-[1.75rem] border border-white/10 bg-slate-900/60 p-4">
+            <div className="flex h-full min-h-0 flex-col gap-4">
+              <section className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-slate-900/60">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-100">
+                      <Camera className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-white">Scanner</p>
+                      <p className="text-sm text-slate-400">Standardmaessig geschlossen</p>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant={scannerOpen ? "secondary" : "outline"}
+                    className={scannerOpen ? "text-slate-950" : "border-white/10 bg-white/5 text-white hover:bg-white/10"}
+                    onClick={() => setScannerOpen((currentValue) => !currentValue)}
+                  >
+                    <Camera className="mr-2 h-4 w-4" />
+                    {scannerOpen ? "Scanner schliessen" : "Scanner oeffnen"}
+                    <ChevronDown className={cn("ml-2 h-4 w-4 transition-transform", scannerOpen ? "rotate-180" : "")} />
+                  </Button>
+                </div>
+
+                {scannerOpen ? (
+                  <div className="border-t border-white/10 p-4">
+                    <BarcodeScanner compact onDetected={selectByBarcode} />
+                  </div>
+                ) : null}
+              </section>
+
+              <section className="flex min-h-0 flex-1 flex-col rounded-[1.75rem] border border-white/10 bg-slate-900/60 p-4">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <Badge variant="muted" className="bg-white/10 text-slate-200">
                     {formatQuantity(groupedArticles.length)} Kategorien
@@ -441,14 +501,14 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                   {defaultCategory ? <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">{defaultCategory}</Badge> : null}
                 </div>
 
-                <div className="grid auto-rows-fr gap-3 md:grid-cols-2">
+                <div className="grid flex-1 content-start justify-center gap-3 [grid-template-columns:repeat(auto-fit,minmax(15rem,18rem))]">
                   {groupedArticles.map(([category, categoryItems]) => (
                     <button
                       key={category}
                       type="button"
                       onClick={() => openCategory(category)}
                       className={cn(
-                        "rounded-[1.5rem] border px-4 py-4 text-left transition",
+                        "min-h-[8.5rem] rounded-[1.5rem] border px-4 py-4 text-left transition",
                         selectedCategory === category
                           ? "border-cyan-400/35 bg-cyan-400/10"
                           : "border-white/10 bg-slate-950/80 hover:border-cyan-400/30 hover:bg-slate-900"
@@ -466,37 +526,6 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                     </button>
                   ))}
                 </div>
-              </section>
-
-              <section className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-slate-900/60">
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
-                  onClick={() => setScannerOpen((currentValue) => !currentValue)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-100">
-                      <Camera className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-white">Scanner</p>
-                      <p className="text-sm text-slate-400">{scannerOpen ? "Aktivieren" : "Geschlossen"}</p>
-                    </div>
-                  </div>
-                  <ChevronDown className={cn("h-5 w-5 text-slate-400 transition-transform", scannerOpen ? "rotate-180" : "")} />
-                </button>
-
-                <div className={cn("h-[calc(100%-4.75rem)] border-t border-white/10 p-4", scannerOpen ? "block" : "hidden")}>
-                  <BarcodeScanner compact onDetected={selectByBarcode} />
-                </div>
-
-                {!scannerOpen ? (
-                  <div className="flex h-[calc(100%-4.75rem)] items-center justify-center p-4">
-                    <div className="flex h-full w-full items-center justify-center rounded-[1.5rem] border border-dashed border-white/10 bg-slate-950/50">
-                      <ScanLine className="h-10 w-10 text-slate-500" />
-                    </div>
-                  </div>
-                ) : null}
               </section>
             </div>
           ) : null}
@@ -530,14 +559,14 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                 </div>
               </div>
 
-              <div className="grid flex-1 min-h-0 auto-rows-fr gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid flex-1 min-h-0 content-start justify-center gap-3 [grid-template-columns:repeat(auto-fit,minmax(14rem,17rem))]">
                 {visibleArticles.map((article) => (
                   <button
                     key={article.id}
                     type="button"
                     onClick={() => openArticle(article)}
                     className={cn(
-                      "rounded-[1.5rem] border px-4 py-4 text-left transition",
+                      "min-h-[8rem] rounded-[1.5rem] border px-4 py-4 text-left transition",
                       bookingSuccess?.articleId === article.id
                         ? "border-emerald-300/35 bg-emerald-400/10"
                         : "border-white/10 bg-slate-900/80 hover:border-cyan-400/30 hover:bg-slate-900"
@@ -585,9 +614,9 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
           ) : null}
 
           {step === "booking" && selectedArticle ? (
-            <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[1fr_0.95fr]">
+            <div className="flex h-full min-h-0 flex-col gap-4">
               <section className="rounded-[1.75rem] border border-cyan-400/20 bg-cyan-500/10 p-5">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
                     size="sm"
@@ -606,24 +635,26 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                   ) : null}
                 </div>
 
-                <h2 className="mt-4 text-3xl font-semibold text-white">{selectedArticle.name}</h2>
-                <div className="mt-5 grid gap-3 md:grid-cols-3">
-                  <div className="rounded-2xl bg-slate-950/60 p-4">
-                    <p className="text-sm text-slate-400">Bestand</p>
-                    <p className="mt-1 text-3xl font-semibold text-white">{formatQuantity(selectedArticle.quantity)}</p>
+                <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <h2 className="text-3xl font-semibold text-white">{selectedArticle.name}</h2>
+                    <p className="mt-2 text-sm text-slate-300">{selectedArticle.barcode}</p>
                   </div>
-                  <div className="rounded-2xl bg-slate-950/60 p-4">
-                    <p className="text-sm text-slate-400">Minimum</p>
-                    <p className="mt-1 text-3xl font-semibold text-white">{formatQuantity(selectedArticle.minimumStock)}</p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-950/60 p-4">
-                    <p className="text-sm text-slate-400">Barcode</p>
-                    <p className="mt-1 break-all text-sm font-medium text-white">{selectedArticle.barcode}</p>
+
+                  <div className="flex flex-wrap gap-3">
+                    <div className="min-w-[8rem] rounded-2xl bg-slate-950/60 px-4 py-3">
+                      <p className="text-sm text-slate-400">Bestand</p>
+                      <p className="mt-1 text-2xl font-semibold text-white">{formatQuantity(selectedArticle.quantity)}</p>
+                    </div>
+                    <div className="min-w-[8rem] rounded-2xl bg-slate-950/60 px-4 py-3">
+                      <p className="text-sm text-slate-400">Minimum</p>
+                      <p className="mt-1 text-2xl font-semibold text-white">{formatQuantity(selectedArticle.minimumStock)}</p>
+                    </div>
                   </div>
                 </div>
               </section>
 
-              <section className="flex min-h-0 flex-col gap-4 rounded-[1.75rem] border border-white/10 bg-slate-900/60 p-4">
+              <section className="flex min-h-0 flex-1 flex-col gap-4 rounded-[1.75rem] border border-white/10 bg-slate-900/60 p-4">
                 {bookingError ? <FormFeedback message={bookingError} tone="error" /> : null}
 
                 <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/60 p-4">
@@ -660,7 +691,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                       TAKE
                     </Badge>
                   </div>
-                  <div className="grid gap-2 md:grid-cols-2">
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {usageReasons.map((reason) => (
                       <Button
                         key={reason}
