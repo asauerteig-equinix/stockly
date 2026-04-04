@@ -2,6 +2,7 @@ import { PurchaseOrderStatus } from "@prisma/client";
 
 import { articlePlaceholderImage } from "@/lib/article-images";
 import { generateOrderNumber } from "@/lib/order-number";
+import { getSuggestedReorderQuantity } from "@/lib/reorder";
 import { prisma } from "@/server/db";
 
 function resolveSuggestedQuantity(article: {
@@ -10,8 +11,7 @@ function resolveSuggestedQuantity(article: {
   location: { settings: { lowStockBuffer: number } | null };
 }) {
   const currentQuantity = article.inventoryBalance?.quantity ?? 0;
-  const targetQuantity = article.minimumStock + (article.location.settings?.lowStockBuffer ?? 0);
-  return Math.max(1, targetQuantity - currentQuantity);
+  return getSuggestedReorderQuantity(currentQuantity, article.minimumStock, article.location.settings?.lowStockBuffer ?? 0);
 }
 
 function createSnapshot(article: {

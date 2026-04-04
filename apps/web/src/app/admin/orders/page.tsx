@@ -1,12 +1,9 @@
 import { OrderWorkspace } from "@/features/orders/order-workspace";
+import { getSuggestedReorderQuantity } from "@/lib/reorder";
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { formatDate, formatDateTime } from "@/server/format";
 import { getWarnings } from "@/server/warnings";
-
-function getSuggestedQuantity(quantity: number, minimumStock: number, lowStockBuffer: number) {
-  return Math.max(1, minimumStock + lowStockBuffer - quantity);
-}
 
 export default async function OrdersPage() {
   const user = await requireUser();
@@ -119,7 +116,7 @@ export default async function OrdersPage() {
           imageUrl: entry.article.imageUrl,
           quantity: entry.quantity,
           minimumStock: entry.article.minimumStock,
-          suggestedQuantity: getSuggestedQuantity(
+          suggestedQuantity: getSuggestedReorderQuantity(
             entry.quantity,
             entry.article.minimumStock,
             entry.location.settings?.lowStockBuffer ?? 0

@@ -515,17 +515,17 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
               {activeDraft ? <OrderStatusBadge status="DRAFT" /> : null}
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl bg-secondary/60 px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Positionen</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="min-w-0 rounded-2xl bg-secondary/60 px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Positionen</p>
                 <p className="mt-1 text-3xl font-semibold text-slate-950">{formatQuantity(activeDraft?.items.length ?? 0)}</p>
               </div>
-              <div className="rounded-2xl bg-secondary/60 px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Gesamtmenge</p>
+              <div className="min-w-0 rounded-2xl bg-secondary/60 px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Gesamtmenge</p>
                 <p className="mt-1 text-3xl font-semibold text-slate-950">{formatQuantity(totalDraftQuantity)}</p>
               </div>
-              <div className="rounded-2xl bg-secondary/60 px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Gesamtsumme</p>
+              <div className="min-w-0 rounded-2xl bg-secondary/60 px-4 py-4 sm:col-span-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Gesamtsumme</p>
                 <p className="mt-1 text-3xl font-semibold text-slate-950">{formatCurrency(totalDraftAmountCents, "0,00 EUR")}</p>
                 {draftItemsWithoutPrice ? (
                   <p className="mt-1 text-sm text-slate-600">{formatQuantity(draftItemsWithoutPrice)} Positionen ohne Preis</p>
