@@ -307,7 +307,7 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
     <div className="space-y-6">
       <FormFeedback message={feedback.message} tone={feedback.tone} />
 
-      <Card className="border-white/80 bg-white/95">
+      <Card className="rounded-[1.25rem] border-stone-300/90 bg-white/92 shadow-[0_16px_40px_rgba(71,85,105,0.10)]">
         <CardHeader className="gap-4">
           <div className="flex flex-wrap gap-3">
             {locations.map((location) => (
@@ -349,9 +349,9 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
         </CardHeader>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_420px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-6">
-          <Card className="border-white/80 bg-white/95">
+          <Card className="rounded-[1.25rem] border-stone-300/90 bg-white/94 shadow-[0_16px_34px_rgba(71,85,105,0.09)]">
             <CardHeader className="gap-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -420,7 +420,7 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
             </CardContent>
           </Card>
 
-          <Card className="border-white/80 bg-white/95">
+          <Card className="rounded-[1.25rem] border-stone-300/90 bg-white/94 shadow-[0_16px_34px_rgba(71,85,105,0.09)]">
             <CardHeader className="gap-3">
               <CardTitle>Weitere Artikel manuell hinzufuegen</CardTitle>
               <CardDescription>Die Auswahl bleibt bewusst simpel: Kategorie waehlen und Artikel direkt anklicken.</CardDescription>
@@ -501,7 +501,7 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
           </Card>
         </div>
 
-        <Card className="border-white/80 bg-white/95 xl:sticky xl:top-8">
+        <Card className="rounded-[1.25rem] border-stone-300/90 bg-white/94 shadow-[0_18px_36px_rgba(71,85,105,0.10)] xl:sticky xl:top-6">
           <CardHeader className="gap-4">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -639,7 +639,7 @@ export function OrderWorkspace({ locations, articles, lowStock, drafts, history 
         </Card>
       </div>
 
-      <Card className="border-white/80 bg-white/90">
+      <Card className="rounded-[1.25rem] border-stone-300/90 bg-white/92 shadow-[0_16px_34px_rgba(71,85,105,0.09)]">
         <CardHeader className="gap-3">
           <div className="flex items-start gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
