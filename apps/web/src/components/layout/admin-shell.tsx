@@ -36,6 +36,14 @@ type AdminShellProps = {
   children: React.ReactNode;
 };
 
+function isNavigationItemActive(pathname: string, href: string) {
+  if (href === "/admin") {
+    return pathname === "/admin";
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function AdminShell({ user, children }: AdminShellProps) {
   const pathname = usePathname();
   const isOrdersRoute = pathname === "/admin/orders" || pathname.startsWith("/admin/orders/");
@@ -69,7 +77,7 @@ export function AdminShell({ user, children }: AdminShellProps) {
             isCollapsed ? "px-3" : "px-5 xl:px-6"
           )}
         >
-          <div className={cn("flex gap-3", isCollapsed ? "items-center justify-center" : "items-start justify-between")}>
+          <div className={cn("flex gap-3", isCollapsed ? "flex-col items-center" : "items-start justify-between")}>
             <Link href="/admin" className={cn("inline-flex items-center gap-3", isCollapsed && "justify-center")}>
               <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 text-white">
                 <Warehouse className="h-6 w-6" />
@@ -86,7 +94,7 @@ export function AdminShell({ user, children }: AdminShellProps) {
               type="button"
               variant="outline"
               size="sm"
-              className="hidden border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950 lg:inline-flex"
+              className="hidden shrink-0 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950 lg:inline-flex"
               aria-label={isCollapsed ? "Menue ausklappen" : "Menue einklappen"}
               onClick={() => setCollapsed((current) => !current)}
             >
@@ -123,7 +131,7 @@ export function AdminShell({ user, children }: AdminShellProps) {
 
           <nav className="mt-6 space-y-1.5">
             {navigation.map(({ href, label, icon: Icon }) => {
-              const active = pathname === href || pathname.startsWith(`${href}/`);
+              const active = isNavigationItemActive(pathname, href);
 
               return (
                 <Link
