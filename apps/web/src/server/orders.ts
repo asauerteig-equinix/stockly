@@ -10,8 +10,7 @@ function resolveSuggestedQuantity(article: {
   inventoryBalance: { quantity: number } | null;
   location: { settings: { lowStockBuffer: number } | null };
 }) {
-  const currentQuantity = article.inventoryBalance?.quantity ?? 0;
-  return getSuggestedReorderQuantity(currentQuantity, article.minimumStock, article.location.settings?.lowStockBuffer ?? 0);
+  return getSuggestedReorderQuantity(article.minimumStock);
 }
 
 function createSnapshot(article: {

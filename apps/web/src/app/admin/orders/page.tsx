@@ -116,11 +116,7 @@ export default async function OrdersPage() {
           imageUrl: entry.article.imageUrl,
           quantity: entry.quantity,
           minimumStock: entry.article.minimumStock,
-          suggestedQuantity: getSuggestedReorderQuantity(
-            entry.quantity,
-            entry.article.minimumStock,
-            entry.location.settings?.lowStockBuffer ?? 0
-          )
+          suggestedQuantity: getSuggestedReorderQuantity(entry.article.minimumStock)
         }))}
         drafts={drafts.map((draft) => ({
           id: draft.id,
