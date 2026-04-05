@@ -62,6 +62,7 @@ type ArticleEntry = {
 };
 
 type ArticleManagementProps = {
+  canDangerousReset: boolean;
   locations: LocationOption[];
   articles: ArticleEntry[];
   images: Array<{
@@ -74,6 +75,7 @@ type ArticleManagementProps = {
 type StatusFilter = "all" | "active" | "archived" | "attention";
 
 const minimumStockPresets = [0, 1, 5, 10, 25] as const;
+const resetConfirmationPhrase = "ARTIKEL RESET";
 
 const emptyValues = (locationId: string): ArticleFormValues => ({
   locationId,
@@ -134,7 +136,7 @@ function getArticleImageSrc(imageUrl: string | null | undefined) {
   return withBasePath(imageUrl || articlePlaceholderImage);
 }
 
-export function ArticleManagement({ locations, articles, images }: ArticleManagementProps) {
+export function ArticleManagement({ canDangerousReset, locations, articles, images }: ArticleManagementProps) {
   const router = useRouter();
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -145,6 +147,8 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [isMediaModalOpen, setMediaModalOpen] = useState(false);
   const [isImagePickerOpen, setImagePickerOpen] = useState(false);
+  const [isResetModalOpen, setResetModalOpen] = useState(false);
+  const [resetConfirmationInput, setResetConfirmationInput] = useState("");
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string | null }>({
     tone: "success",
     message: null
@@ -327,6 +331,44 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
     });
   }
 
+  function handleDangerousReset() {
+    if (resetConfirmationInput.trim() !== resetConfirmationPhrase) {
+      setFeedback({
+        tone: "error",
+        message: `Bitte zur Bestätigung exakt "${resetConfirmationPhrase}" eingeben.`
+      });
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const response = await fetchJson<{ ok: boolean; message: string }>("/api/articles/reset", {
+          method: "POST",
+          body: JSON.stringify({
+            confirmation: resetConfirmationPhrase
+          })
+        });
+
+        setFeedback({
+          tone: "success",
+          message: response.message
+        });
+        setResetConfirmationInput("");
+        setResetModalOpen(false);
+        setSelectedArticleId(null);
+        setEditorOpen(false);
+        setImagePickerOpen(false);
+        form.reset(emptyValues(defaultFormLocationId));
+        router.refresh();
+      } catch (error) {
+        setFeedback({
+          tone: "error",
+          message: error instanceof Error ? error.message : "Artikelbestand konnte nicht komplett zurückgesetzt werden."
+        });
+      }
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
@@ -374,6 +416,12 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
               <Images className="mr-2 h-4 w-4" />
               Bildbibliothek
             </Button>
+            {canDangerousReset ? (
+              <Button type="button" variant="destructive" onClick={() => setResetModalOpen(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Alle Artikel resetten
+              </Button>
+            ) : null}
             <Button onClick={startNewArticle}>
               <Plus className="mr-2 h-4 w-4" />
               Neuer Artikel
@@ -825,6 +873,48 @@ export function ArticleManagement({ locations, articles, images }: ArticleManage
         description="Importe liegen bewusst ausserhalb der Hauptseite, damit die Artikelliste schnell sichtbar bleibt."
       >
         <ArticleImportTools />
+      </Modal>
+
+      <Modal
+        open={isResetModalOpen}
+        onClose={() => {
+          setResetModalOpen(false);
+          setResetConfirmationInput("");
+        }}
+        title="Artikelbestand komplett resetten"
+        className="max-w-2xl"
+        headerActions={
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={isPending || resetConfirmationInput.trim() !== resetConfirmationPhrase}
+            onClick={handleDangerousReset}
+          >
+            {isPending ? "Setzt zurueck..." : "Reset jetzt ausfuehren"}
+          </Button>
+        }
+      >
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-4 text-sm text-slate-700">
+            <p className="font-semibold text-slate-950">Achtung: Dieser Schritt entfernt mehr als nur die Artikel.</p>
+            <p className="mt-2">
+              Es werden alle Artikel, Lagerbewegungen, Bestellentwürfe und Bestellhistorien gelöscht. Das ist für frische
+              Deployments und einen sauberen Neuimport gedacht.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="dangerous-reset-confirmation">Zur Bestätigung eingeben</Label>
+            <Input
+              id="dangerous-reset-confirmation"
+              value={resetConfirmationInput}
+              onChange={(event) => setResetConfirmationInput(event.target.value)}
+              placeholder={resetConfirmationPhrase}
+              autoComplete="off"
+            />
+            <p className="text-xs text-slate-500">Bitte exakt {resetConfirmationPhrase} eingeben.</p>
+          </div>
+        </div>
       </Modal>
 
       <Modal

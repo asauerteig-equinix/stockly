@@ -59,6 +59,7 @@ export default async function ArticlesPage() {
       />
 
       <ArticleManagement
+        canDangerousReset={user.role === "MASTER_ADMIN"}
         locations={locations.map((location) => ({
           id: location.id,
           name: location.name,
