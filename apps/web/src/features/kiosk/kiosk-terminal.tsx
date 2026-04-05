@@ -400,10 +400,10 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
 
   return (
     <div className="relative flex h-full min-h-0 flex-col gap-3 overflow-hidden" onPointerDownCapture={handleInteractionCapture}>
-      <section className="flex items-center justify-between gap-3 rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-3 text-white">
+      <section className="flex items-center justify-between gap-3 rounded-[1.5rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-white">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">{kiosk.locationCode}</Badge>
-          <Badge variant="muted" className="bg-white/10 text-slate-100">
+          <Badge className="border border-white/15 bg-white/[0.08] text-slate-100">{kiosk.locationCode}</Badge>
+          <Badge variant="muted" className="bg-white/[0.1] text-slate-100">
             {kiosk.locationName}
           </Badge>
           <Badge variant="success">Kiosk aktiv</Badge>
@@ -412,7 +412,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
         <Button
           type="button"
           variant="outline"
-          className="h-11 w-11 border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
+          className="h-11 w-11 border-white/10 bg-white/[0.06] p-0 text-white hover:bg-white/[0.1]"
           onClick={() => setServicePanelOpen((currentValue) => !currentValue)}
           aria-label="Service-Menue"
         >
@@ -422,10 +422,13 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
 
       {servicePanelOpen ? (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm"
           onClick={() => setServicePanelOpen(false)}
         >
-          <Card className="w-full max-w-sm border-white/10 bg-slate-950/96 text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+          <Card
+            className="w-full max-w-sm border-white/10 bg-slate-900/96 text-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
             <CardContent className="space-y-4 p-5">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -435,7 +438,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-10 w-10 border-white/10 bg-white/5 p-0 text-white hover:bg-white/10"
+                  className="h-10 w-10 border-white/10 bg-white/[0.06] p-0 text-white hover:bg-white/[0.1]"
                   onClick={() => setServicePanelOpen(false)}
                   aria-label="Modal schliessen"
                 >
@@ -446,7 +449,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
               <Button
                 type="button"
                 variant="outline"
-                className="w-full border-white/10 bg-transparent text-white hover:bg-white/5"
+                className="w-full border-white/10 bg-transparent text-white hover:bg-white/[0.06]"
                 disabled={isPending}
                 onClick={resetKiosk}
               >
@@ -459,14 +462,14 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
 
       {feedback ? <FormFeedback message={feedback.message} tone={feedback.tone} /> : null}
 
-      <Card className="flex-1 overflow-hidden border-white/10 bg-slate-950/88 text-white">
+      <Card className="flex-1 overflow-hidden border-white/10 bg-slate-900/88 text-white">
         <CardContent className="h-full p-4">
           {step === "categories" ? (
             <div className="flex h-full min-h-0 flex-col gap-4">
-              <section className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-slate-900/60">
+              <section className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-slate-800/55">
                 <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-100">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-slate-100">
                       <Camera className="h-5 w-5" />
                     </div>
                     <div>
@@ -478,7 +481,11 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                   <Button
                     type="button"
                     variant={scannerOpen ? "secondary" : "outline"}
-                    className={scannerOpen ? "text-slate-950" : "border-white/10 bg-white/5 text-white hover:bg-white/10"}
+                    className={
+                      scannerOpen
+                        ? "border-white/15 bg-slate-100 text-slate-950 hover:bg-white"
+                        : "border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]"
+                    }
                     onClick={() => setScannerOpen((currentValue) => !currentValue)}
                   >
                     <Camera className="mr-2 h-4 w-4" />
@@ -494,12 +501,14 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                 ) : null}
               </section>
 
-              <section className="flex min-h-0 flex-1 flex-col rounded-[1.75rem] border border-white/10 bg-slate-900/60 p-4">
+              <section className="flex min-h-0 flex-1 flex-col rounded-[1.75rem] border border-white/10 bg-slate-800/55 p-4">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <Badge variant="muted" className="bg-white/10 text-slate-200">
+                  <Badge variant="muted" className="bg-white/[0.1] text-slate-200">
                     {formatQuantity(groupedArticles.length)} Kategorien
                   </Badge>
-                  {defaultCategory ? <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">{defaultCategory}</Badge> : null}
+                  {defaultCategory ? (
+                    <Badge className="border border-white/15 bg-white/[0.08] text-slate-100">{defaultCategory}</Badge>
+                  ) : null}
                 </div>
 
                 <div className="grid flex-1 content-start justify-center gap-3 [grid-template-columns:repeat(auto-fit,minmax(15rem,18rem))]">
@@ -511,8 +520,8 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                       className={cn(
                         "min-h-[clamp(6.75rem,13vh,8.5rem)] rounded-[1.5rem] border px-4 py-4 text-left transition",
                         selectedCategory === category
-                          ? "border-cyan-400/35 bg-cyan-400/10"
-                          : "border-white/10 bg-slate-950/80 hover:border-cyan-400/30 hover:bg-slate-900"
+                          ? "border-white/20 bg-white/[0.08]"
+                          : "border-white/10 bg-slate-900/70 hover:border-white/20 hover:bg-slate-800/80"
                       )}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -521,7 +530,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                           <p className="mt-2 text-sm text-slate-400">{formatQuantity(categoryItems.length)} Artikel</p>
                         </div>
                         {category.toLowerCase() === "kabel" || categoryItems.some(isPatchFocusedArticle) ? (
-                          <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">Fokus</Badge>
+                          <Badge className="border border-white/15 bg-white/[0.08] text-slate-100">Fokus</Badge>
                         ) : null}
                       </div>
                     </button>
@@ -539,21 +548,23 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="border-white/10 bg-white/5 text-white hover:bg-white/10"
+                    className="border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]"
                     onClick={() => setStep("categories")}
                   >
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Kategorien
                   </Button>
-                  {activeCategory ? <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">{activeCategory}</Badge> : null}
+                  {activeCategory ? (
+                    <Badge className="border border-white/15 bg-white/[0.08] text-slate-100">{activeCategory}</Badge>
+                  ) : null}
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Badge variant="muted" className="bg-white/10 text-slate-200">
+                  <Badge variant="muted" className="bg-white/[0.1] text-slate-200">
                     {formatQuantity(categoryArticles.length)} Artikel
                   </Badge>
                   {totalArticlePages > 1 ? (
-                    <Badge variant="muted" className="bg-white/10 text-slate-200">
+                    <Badge variant="muted" className="bg-white/[0.1] text-slate-200">
                       {articlePage + 1}/{totalArticlePages}
                     </Badge>
                   ) : null}
@@ -566,13 +577,13 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                     key={article.id}
                     type="button"
                     onClick={() => openArticle(article)}
-                    className={cn(
-                      "min-h-[clamp(6.5rem,12vh,8rem)] rounded-[1.5rem] border px-4 py-4 text-left transition",
-                      bookingSuccess?.articleId === article.id
-                        ? "border-emerald-300/35 bg-emerald-400/10"
-                        : "border-white/10 bg-slate-900/80 hover:border-cyan-400/30 hover:bg-slate-900"
-                    )}
-                  >
+                      className={cn(
+                        "min-h-[clamp(6.5rem,12vh,8rem)] rounded-[1.5rem] border px-4 py-4 text-left transition",
+                        bookingSuccess?.articleId === article.id
+                          ? "border-emerald-300/35 bg-emerald-400/10"
+                          : "border-white/10 bg-slate-900/75 hover:border-white/20 hover:bg-slate-800/80"
+                      )}
+                    >
                     <div className="flex items-start gap-3">
                       <img
                         src={getArticleImageSrc(article.imageUrl)}
@@ -601,7 +612,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                   <Button
                     type="button"
                     variant="outline"
-                    className="border-white/10 bg-white/5 text-white hover:bg-white/10"
+                    className="border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]"
                     disabled={articlePage === 0}
                     onClick={() => setArticlePage((currentValue) => currentValue - 1)}
                   >
@@ -610,7 +621,7 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                   <Button
                     type="button"
                     variant="outline"
-                    className="border-white/10 bg-white/5 text-white hover:bg-white/10"
+                    className="border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]"
                     disabled={articlePage >= totalArticlePages - 1}
                     onClick={() => setArticlePage((currentValue) => currentValue + 1)}
                   >
@@ -623,23 +634,23 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
 
           {step === "booking" && selectedArticle ? (
             <div className="flex h-full min-h-0 flex-col gap-4">
-              <section className="rounded-[1.75rem] border border-cyan-400/20 bg-cyan-500/10 p-5">
+              <section className="rounded-[1.75rem] border border-white/10 bg-white/[0.05] p-5">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="border-white/10 bg-white/5 text-white hover:bg-white/10"
+                    className="border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]"
                     onClick={() => setStep("articles")}
                   >
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Artikel
                   </Button>
-                  <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                  <Badge className="border border-white/15 bg-white/[0.08] text-slate-100">
                     {normalizeCategory(selectedArticle.category)}
                   </Badge>
                   {isPatchFocusedArticle(selectedArticle) ? (
-                    <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">Fokus</Badge>
+                    <Badge className="border border-white/15 bg-white/[0.08] text-slate-100">Fokus</Badge>
                   ) : null}
                 </div>
 
@@ -657,11 +668,11 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                   </div>
 
                   <div className="flex flex-wrap gap-3">
-                    <div className="min-w-[8rem] rounded-2xl bg-slate-950/60 px-4 py-3">
+                    <div className="min-w-[8rem] rounded-2xl bg-slate-950/50 px-4 py-3">
                       <p className="text-sm text-slate-400">Bestand</p>
                       <p className="mt-1 text-2xl font-semibold text-white">{formatQuantity(selectedArticle.quantity)}</p>
                     </div>
-                    <div className="min-w-[8rem] rounded-2xl bg-slate-950/60 px-4 py-3">
+                    <div className="min-w-[8rem] rounded-2xl bg-slate-950/50 px-4 py-3">
                       <p className="text-sm text-slate-400">Minimum</p>
                       <p className="mt-1 text-2xl font-semibold text-white">{formatQuantity(selectedArticle.minimumStock)}</p>
                     </div>
@@ -669,13 +680,13 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                 </div>
               </section>
 
-              <section className="flex min-h-0 flex-1 flex-col gap-4 rounded-[1.75rem] border border-white/10 bg-slate-900/60 p-4">
+              <section className="flex min-h-0 flex-1 flex-col gap-4 rounded-[1.75rem] border border-white/10 bg-slate-800/55 p-4">
                 {bookingError ? <FormFeedback message={bookingError} tone="error" /> : null}
 
-                <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/60 p-4">
+                <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/50 p-4">
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <p className="text-sm font-medium text-white">Menge</p>
-                    <Badge variant="muted" className="bg-white/10 text-slate-200">
+                    <Badge variant="muted" className="bg-white/[0.1] text-slate-200">
                       {formatQuantity(quantity)}
                     </Badge>
                   </div>
@@ -685,19 +696,19 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                       type="button"
                       size="lg"
                       variant="outline"
-                      className="h-[clamp(4.5rem,10vh,5.5rem)] rounded-[1.5rem] border-white/10 bg-white/5 text-[clamp(2rem,5vh,2.75rem)] text-white hover:bg-white/10"
+                      className="h-[clamp(4.5rem,10vh,5.5rem)] rounded-[1.5rem] border-white/10 bg-white/[0.06] text-[clamp(2rem,5vh,2.75rem)] text-white hover:bg-white/[0.1]"
                       onClick={() => adjustQuantity(-1)}
                     >
                       -
                     </Button>
-                    <div className="flex h-[clamp(4.5rem,10vh,5.5rem)] items-center justify-center rounded-[1.5rem] border border-cyan-400/20 bg-cyan-400/10 text-[clamp(2rem,5vh,2.75rem)] font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+                    <div className="flex h-[clamp(4.5rem,10vh,5.5rem)] items-center justify-center rounded-[1.5rem] border border-white/15 bg-white/[0.08] text-[clamp(2rem,5vh,2.75rem)] font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
                       {formatQuantity(quantity)}
                     </div>
                     <Button
                       type="button"
                       size="lg"
                       variant="outline"
-                      className="h-[clamp(4.5rem,10vh,5.5rem)] rounded-[1.5rem] border-white/10 bg-white/5 text-[clamp(2rem,5vh,2.75rem)] text-white hover:bg-white/10"
+                      className="h-[clamp(4.5rem,10vh,5.5rem)] rounded-[1.5rem] border-white/10 bg-white/[0.06] text-[clamp(2rem,5vh,2.75rem)] text-white hover:bg-white/[0.1]"
                       onClick={() => adjustQuantity(1)}
                     >
                       +
@@ -714,8 +725,8 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                           variant={quantity === preset ? "secondary" : "outline"}
                           className={
                             quantity === preset
-                              ? "h-14 rounded-2xl text-base"
-                              : "h-14 rounded-2xl border-white/10 bg-white/5 text-base text-white hover:bg-white/10"
+                              ? "h-14 rounded-2xl bg-slate-100 text-base text-slate-950 hover:bg-white"
+                              : "h-14 rounded-2xl border-white/10 bg-white/[0.06] text-base text-white hover:bg-white/[0.1]"
                           }
                           onClick={() => setQuantity(preset)}
                         >
@@ -726,10 +737,10 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                   </div>
                 </div>
 
-                <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/60 p-4">
+                <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/50 p-4">
                   <div className="mb-3 flex items-center gap-2">
                     <p className="text-sm font-medium text-white">Entnahmegrund</p>
-                    <Badge variant="muted" className="bg-white/10 text-slate-200">
+                    <Badge variant="muted" className="bg-white/[0.1] text-slate-200">
                       TAKE
                     </Badge>
                   </div>
@@ -739,7 +750,11 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                         key={reason}
                         type="button"
                         variant={usageReason === reason ? "default" : "outline"}
-                        className={usageReason === reason ? "" : "justify-start border-white/10 bg-white/5 text-white hover:bg-white/10"}
+                        className={
+                          usageReason === reason
+                            ? "justify-start bg-slate-100 text-slate-950 hover:bg-white"
+                            : "justify-start border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]"
+                        }
                         onClick={() => setUsageReason(reason)}
                       >
                         {reason}
@@ -749,13 +764,18 @@ export function KioskTerminal({ kiosk, usageReasons, articles, popularArticleIds
                 </div>
 
                 <div className="mt-auto grid gap-3 md:grid-cols-2">
-                  <Button size="lg" className="h-16 text-lg" disabled={isPending} onClick={() => book("TAKE")}>
+                  <Button
+                    size="lg"
+                    className="h-16 bg-slate-100 text-lg text-slate-950 hover:bg-white"
+                    disabled={isPending}
+                    onClick={() => book("TAKE")}
+                  >
                     {pendingAction === "TAKE" ? "Bucht..." : "Entnahme buchen"}
                   </Button>
                   <Button
                     size="lg"
                     variant="outline"
-                    className="h-16 border-white/15 bg-transparent text-lg text-white hover:bg-white/5"
+                    className="h-16 border-white/15 bg-white/[0.04] text-lg text-white hover:bg-white/[0.08]"
                     disabled={isPending}
                     onClick={() => book("RETURN")}
                   >

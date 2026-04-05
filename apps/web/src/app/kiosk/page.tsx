@@ -87,7 +87,7 @@ export default async function KioskPage() {
   });
 
   return (
-    <main className="h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.16),_transparent_18%),radial-gradient(circle_at_bottom_right,_rgba(249,115,22,0.14),_transparent_22%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] text-white">
+    <main className="h-[100dvh] overflow-hidden bg-[linear-gradient(180deg,_#111827_0%,_#1f2937_100%)] text-slate-50">
       {kiosk ? (
         <div className="page-shell h-full py-3">
           <KioskTerminal
@@ -114,9 +114,11 @@ export default async function KioskPage() {
         <div className="page-shell flex h-full items-center justify-center py-8">
           <div className="w-full max-w-xl space-y-4">
             <div className="space-y-2 text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">Kiosk Setup</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">Kiosk Setup</p>
               <h1 className="text-3xl font-semibold tracking-tight text-white">Terminal koppeln</h1>
-              <p className="text-sm text-slate-400">Standort waehlen, PIN eingeben, danach startet direkt die Buchungsansicht.</p>
+              <p className="text-sm text-slate-300/75">
+                Standort waehlen, PIN eingeben, danach startet direkt die Buchungsansicht.
+              </p>
             </div>
 
             <KioskPairingCard

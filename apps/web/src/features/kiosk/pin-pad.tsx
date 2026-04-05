@@ -46,10 +46,10 @@ export function PinPad({
     <div className={cn("space-y-3", className)}>
       <div className="space-y-1">
         <p className="text-sm font-medium">{label}</p>
-        {description ? <p className="text-sm text-slate-400">{description}</p> : null}
+        {description ? <p className="text-sm text-slate-300/75">{description}</p> : null}
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-4 text-center text-3xl font-semibold tracking-[0.35em] text-white">
+      <div className="rounded-2xl border border-white/10 bg-slate-800/65 px-4 py-4 text-center text-3xl font-semibold tracking-[0.35em] text-white">
         {value || "----"}
       </div>
 
@@ -61,7 +61,7 @@ export function PinPad({
                 key={key}
                 type="button"
                 variant="outline"
-                className="h-16 border-white/10 bg-slate-950/70 text-base text-white hover:bg-white/5"
+                className="h-16 border-white/10 bg-slate-900/75 text-base text-white hover:bg-white/[0.08]"
                 onClick={() => handleKey(key)}
               >
                 Leeren
@@ -75,7 +75,7 @@ export function PinPad({
                 key={key}
                 type="button"
                 variant="outline"
-                className="h-16 border-white/10 bg-slate-950/70 text-white hover:bg-white/5"
+                className="h-16 border-white/10 bg-slate-900/75 text-white hover:bg-white/[0.08]"
                 onClick={() => handleKey(key)}
               >
                 <Delete className="h-5 w-5" />
@@ -88,7 +88,7 @@ export function PinPad({
               key={key}
               type="button"
               variant="outline"
-              className="h-16 border-white/10 bg-slate-950/70 text-2xl font-semibold text-white hover:bg-white/5"
+              className="h-16 border-white/10 bg-slate-900/75 text-2xl font-semibold text-white hover:bg-white/[0.08]"
               onClick={() => handleKey(key)}
             >
               {key}

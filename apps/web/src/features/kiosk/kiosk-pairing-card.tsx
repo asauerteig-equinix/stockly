@@ -40,16 +40,16 @@ export function KioskPairingCard({ locations }: KioskPairingCardProps) {
   const label = selectedLocation ? `Kiosk ${selectedLocation.code}` : "Lagerterminal";
 
   return (
-    <Card className="border-white/10 bg-slate-950/85 text-white">
+    <Card className="border-white/10 bg-slate-900/88 text-white shadow-[0_24px_60px_rgba(15,23,42,0.24)]">
       <CardHeader className="gap-4">
         <div className="flex items-center gap-2">
-          <Badge className="border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">PIN</Badge>
-          <Badge variant="muted" className="bg-white/10 text-slate-200">
+          <Badge className="border border-white/15 bg-white/[0.08] text-slate-100">PIN</Badge>
+          <Badge variant="muted" className="bg-white/[0.1] text-slate-200">
             Erster Start
           </Badge>
         </div>
         <CardTitle>Kiosk koppeln</CardTitle>
-        <CardDescription className="text-slate-400">
+        <CardDescription className="text-slate-300/80">
           Standort waehlen, PIN antippen, fertig. Ein Terminalname wird automatisch vergeben.
         </CardDescription>
       </CardHeader>
@@ -57,8 +57,8 @@ export function KioskPairingCard({ locations }: KioskPairingCardProps) {
         <FormFeedback message={feedback.message} tone={feedback.tone} />
 
         <div className="grid gap-5">
-          <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-900/70 p-4">
-            <div className="flex items-center gap-2 text-cyan-200">
+          <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-800/60 p-4">
+            <div className="flex items-center gap-2 text-slate-200">
               <MapPin className="h-4 w-4" />
               <span className="text-xs font-semibold uppercase tracking-[0.18em]">Standort</span>
             </div>
@@ -73,8 +73,8 @@ export function KioskPairingCard({ locations }: KioskPairingCardProps) {
               ))}
             </Select>
 
-            <div className="rounded-2xl bg-slate-950/80 px-4 py-3 text-sm text-slate-300">
-              <div className="flex items-center gap-2 text-emerald-200">
+            <div className="rounded-2xl bg-slate-950/55 px-4 py-3 text-sm text-slate-300">
+              <div className="flex items-center gap-2 text-emerald-100">
                 <CheckCircle2 className="h-4 w-4" />
                 <span className="font-medium text-white">Terminalname</span>
               </div>
@@ -92,7 +92,7 @@ export function KioskPairingCard({ locations }: KioskPairingCardProps) {
         </div>
 
         <Button
-          className="w-full"
+          className="w-full bg-slate-100 text-slate-950 hover:bg-white"
           size="lg"
           disabled={isPending}
           onClick={() =>
