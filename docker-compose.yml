@@ -43,8 +43,10 @@ services:
     ports:
       - "5600:3000"
     networks:
-      - backend
-      - proxy
+      backend:
+      proxy:
+        aliases:
+          - ${APP_NETWORK_ALIAS:-stockly-app}
     healthcheck:
       test: ["CMD", "node", "scripts/healthcheck.mjs"]
       interval: 20s

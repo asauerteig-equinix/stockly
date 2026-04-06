@@ -86,6 +86,7 @@ Danach ist die Anwendung intern unter `http://<server>:5600` erreichbar.
 - Die Compose-Datei erzeugt die korrekte interne `DATABASE_URL` jetzt automatisch aus `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` und `DATABASE_HOST`.
 - Nur die Web-App sollte im gemeinsamen Reverse-Proxy-Netz haengen. Die Datenbank bleibt ausschliesslich im internen Backend-Netz des Stacks.
 - Genau diese Trennung verhindert typische Namenskollisionen mit anderen PostgreSQL-Containern in gemeinsam genutzten Docker-Netzwerken.
+- Falls euer Reverse Proxy Container-zu-Container ueber das Docker-Netz spricht, verwendet dort als Upstream am besten `${APP_NETWORK_ALIAS}:3000`, standardmaessig also `stockly-app:3000`.
 - Fuer internen Direktzugriff ueber `http` muss `COOKIE_SECURE=false` bleiben, damit Browser die Login- und Kiosk-Cookies akzeptieren.
 - Hinter einem HTTPS-Reverse-Proxy sollte `APP_URL` auf die externe HTTPS-Adresse zeigen und `COOKIE_SECURE=true` gesetzt werden.
 
@@ -111,6 +112,7 @@ Hinweis:
 - Ein `502 Bad Gateway` vom Reverse Proxy bedeutet meist, dass die App selbst nicht erfolgreich gestartet ist oder nicht im erwarteten Proxy-Netz haengt.
 - Wenn die App-Logs keine DB-Verbindung bekommen, pruefe zuerst, ob die Datenbank versehentlich ebenfalls in das gemeinsame Reverse-Proxy-Netz gehaengt wurde.
 - In einem geteilten Docker-Netz koennen generische Hostnamen wie `db` mit anderen Stacks kollidieren. Deshalb verwendet dieser Stack jetzt standardmaessig `stockly-db`.
+- Dasselbe gilt fuer generische App-Namen wie `app`. Fuer den Proxy ist deshalb standardmaessig `stockly-app` als Alias vorgesehen.
 - Wenn ihr den Hostnamen bereits anderweitig konfiguriert habt, muss `DATABASE_HOST` zu genau diesem internen Alias passen.
 
 ## Schnellstart lokal ohne Docker

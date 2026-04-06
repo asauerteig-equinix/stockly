@@ -7,6 +7,7 @@
 - Innerhalb des Stacks nutzt die App trotzdem immer die interne Datenbank-Adresse `${DATABASE_HOST}:5432`, standardmaessig also `stockly-db:5432`.
 - Die Datenbank haengt nur im internen Backend-Netz des Stacks. Nur die Web-App wird zusaetzlich in das Reverse-Proxy-Netz aufgenommen.
 - Damit werden Namenskollisionen mit anderen Diensten wie `db` in gemeinsam genutzten Docker-Netzwerken vermieden.
+- Fuer den Reverse Proxy ist im gemeinsamen Docker-Netz zusaetzlich ein eindeutiger App-Alias vorgesehen: `${APP_NETWORK_ALIAS}:3000`, standardmaessig `stockly-app:3000`.
 - Beim Containerstart werden zuerst `prisma migrate deploy` und optional ein Seed bei leerer Datenbank ausgefuehrt.
 - Der Bootstrap versucht Datenbankmigrationen mehrfach erneut, falls PostgreSQL kurz nach dem Stack-Start noch nicht bereit ist.
 - `apps/web/Dockerfile` ist so aufgeteilt, dass `npm ci` und `prisma generate` zwischen Deployments besser gecacht werden koennen.
