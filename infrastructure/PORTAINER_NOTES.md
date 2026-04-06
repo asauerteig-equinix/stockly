@@ -4,7 +4,9 @@
 - `docker-compose.yml` ist auf Portainer-Stack-Betrieb ausgerichtet und nutzt das `production`-Target aus `apps/web/Dockerfile`.
 - Die Web-App wird weiterhin direkt auf dem Portainer-Geraet aus dem Git-Repository gebaut. Es wird bewusst kein extern vorgebautes Image vorausgesetzt.
 - Die Web-App ist extern auf Port `5600` gemappt, PostgreSQL auf `5416`.
-- Innerhalb des Stacks nutzt die App trotzdem immer die interne Datenbank-Adresse `db:5432`.
+- Innerhalb des Stacks nutzt die App trotzdem immer die interne Datenbank-Adresse `${DATABASE_HOST}:5432`, standardmaessig also `stockly-db:5432`.
+- Die Datenbank haengt nur im internen Backend-Netz des Stacks. Nur die Web-App wird zusaetzlich in das Reverse-Proxy-Netz aufgenommen.
+- Damit werden Namenskollisionen mit anderen Diensten wie `db` in gemeinsam genutzten Docker-Netzwerken vermieden.
 - Beim Containerstart werden zuerst `prisma migrate deploy` und optional ein Seed bei leerer Datenbank ausgefuehrt.
 - Der Bootstrap versucht Datenbankmigrationen mehrfach erneut, falls PostgreSQL kurz nach dem Stack-Start noch nicht bereit ist.
 - `apps/web/Dockerfile` ist so aufgeteilt, dass `npm ci` und `prisma generate` zwischen Deployments besser gecacht werden koennen.
@@ -13,6 +15,7 @@
 - Fuer internes HTTP sollte `COOKIE_SECURE=false` gesetzt bleiben, damit Browser die Session-Cookies nicht verwerfen.
 - Fuer den browserbasierten Kamera-Scan im Kiosk ist in der Praxis HTTPS oder `localhost` noetig. Reines LAN-HTTP blockiert den Kamerazugriff meist ohne Berechtigungsdialog.
 - Wenn bereits ein vorgeschalteter Nginx-Proxy HTTPS terminiert, sollte die App intern auf `http://<host>:5600` bleiben.
+- In diesem Fall `REVERSE_PROXY_NETWORK_EXTERNAL=true` setzen und `REVERSE_PROXY_NETWORK` auf den Namen des bereits vorhandenen Proxy-Netzes stellen.
 - In diesem Fall `APP_URL` auf die externe HTTPS-Adresse des Proxys setzen und `COOKIE_SECURE=true` aktivieren.
 - Fuer einen Unterpfad-Deploy wie `/stockly` muss zusaetzlich `BASE_PATH=/stockly` bereits beim Build gesetzt sein.
 - In Portainer also sowohl den Build-Arg als auch die Laufzeitvariable `BASE_PATH=/stockly` setzen.
@@ -20,3 +23,4 @@
 - Fuer den Scanner zaehlt die HTTPS-Verbindung zwischen Browser und Proxy. Die Verbindung vom Proxy zur App darf dabei weiterhin HTTP sein.
 - Wichtig bleibt, dass das Proxy-Zertifikat vom Browser als vertrauenswuerdig akzeptiert wird.
 - Vor dem ersten Produktivstart sollten `SESSION_SECRET`, `KIOSK_SECRET` und PostgreSQL-Zugangsdaten ersetzt werden.
+- Lokal kann `REVERSE_PROXY_NETWORK_EXTERNAL=false` bleiben. Docker legt das zusaetzliche Netz dann selbst an, auch wenn kein Reverse Proxy vorhanden ist.

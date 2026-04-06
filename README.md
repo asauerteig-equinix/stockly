@@ -71,18 +71,21 @@ Wichtig fuer Portainer:
 1. Stack aus dem Git-Repository deployen, damit Portainer den Build-Kontext `apps/web` sauber verwenden kann.
 2. Die Variablen aus `.env.example` als Stack-Umgebungsvariablen in Portainer setzen.
 3. Vor allem `SESSION_SECRET`, `KIOSK_SECRET` und `POSTGRES_PASSWORD` produktiv ersetzen.
-4. Wenn ein vorgeschalteter Reverse Proxy HTTPS terminiert, `APP_URL` auf die externe HTTPS-Adresse setzen und `COOKIE_SECURE=true` aktivieren.
-5. Fuer einen Unterpfad-Deploy wie `/stockly` zusaetzlich `BASE_PATH=/stockly` setzen und den Stack danach neu bauen.
-5. Stack deployen.
+4. Wenn ein vorgeschalteter Reverse Proxy vorhanden ist, `REVERSE_PROXY_NETWORK_EXTERNAL=true` und `REVERSE_PROXY_NETWORK=<name-des-bestehenden-proxy-netzes>` setzen.
+5. Wenn ein vorgeschalteter Reverse Proxy HTTPS terminiert, `APP_URL` auf die externe HTTPS-Adresse setzen und `COOKIE_SECURE=true` aktivieren.
+6. Fuer einen Unterpfad-Deploy wie `/stockly` zusaetzlich `BASE_PATH=/stockly` setzen und den Stack danach neu bauen.
+7. Stack deployen.
 
 Danach ist die Anwendung intern unter `http://<server>:5600` erreichbar.
 
 ### Wichtig fuer die Datenbank-Verbindung in Portainer
 
-- Innerhalb des Stacks spricht die App immer mit PostgreSQL ueber `db:5432`.
+- Innerhalb des Stacks spricht die App immer mit PostgreSQL ueber `${DATABASE_HOST}:5432`, standardmaessig also `stockly-db:5432`.
 - Der externe Host-Port `5416` ist nur fuer Zugriffe von ausserhalb des Stacks gedacht.
-- In Portainer solltest du deshalb **keine eigene `DATABASE_URL` mit `db:5416` oder `localhost:5416` setzen**.
-- Die Compose-Datei erzeugt die korrekte interne `DATABASE_URL` jetzt automatisch aus `POSTGRES_USER`, `POSTGRES_PASSWORD` und `POSTGRES_DB`.
+- In Portainer solltest du deshalb **keine eigene `DATABASE_URL` mit `stockly-db:5416`, `db:5416` oder `localhost:5416` setzen**.
+- Die Compose-Datei erzeugt die korrekte interne `DATABASE_URL` jetzt automatisch aus `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` und `DATABASE_HOST`.
+- Nur die Web-App sollte im gemeinsamen Reverse-Proxy-Netz haengen. Die Datenbank bleibt ausschliesslich im internen Backend-Netz des Stacks.
+- Genau diese Trennung verhindert typische Namenskollisionen mit anderen PostgreSQL-Containern in gemeinsam genutzten Docker-Netzwerken.
 - Fuer internen Direktzugriff ueber `http` muss `COOKIE_SECURE=false` bleiben, damit Browser die Login- und Kiosk-Cookies akzeptieren.
 - Hinter einem HTTPS-Reverse-Proxy sollte `APP_URL` auf die externe HTTPS-Adresse zeigen und `COOKIE_SECURE=true` gesetzt werden.
 
@@ -97,6 +100,18 @@ Danach ist die Anwendung intern unter `http://<server>:5600` erreichbar.
 1. `.env.example` nach `.env` kopieren und Werte bei Bedarf anpassen.
 2. `docker compose up --build` aus dem Projektwurzelverzeichnis starten.
 3. Die Anwendung ist dann unter `http://localhost:5600` erreichbar.
+
+Hinweis:
+
+- Lokal kann `REVERSE_PROXY_NETWORK_EXTERNAL=false` bleiben. Docker erstellt dann das zusaetzliche Proxy-Netz selbst, auch wenn gar kein Reverse Proxy mitlaeuft.
+- Auf einem Server mit vorhandenem Proxy-Netz muss `REVERSE_PROXY_NETWORK_EXTERNAL=true` gesetzt sein, damit Compose stattdessen das bestehende Netz verwendet.
+
+### Troubleshooting bei 502 / Datenbankfehlern
+
+- Ein `502 Bad Gateway` vom Reverse Proxy bedeutet meist, dass die App selbst nicht erfolgreich gestartet ist oder nicht im erwarteten Proxy-Netz haengt.
+- Wenn die App-Logs keine DB-Verbindung bekommen, pruefe zuerst, ob die Datenbank versehentlich ebenfalls in das gemeinsame Reverse-Proxy-Netz gehaengt wurde.
+- In einem geteilten Docker-Netz koennen generische Hostnamen wie `db` mit anderen Stacks kollidieren. Deshalb verwendet dieser Stack jetzt standardmaessig `stockly-db`.
+- Wenn ihr den Hostnamen bereits anderweitig konfiguriert habt, muss `DATABASE_HOST` zu genau diesem internen Alias passen.
 
 ## Schnellstart lokal ohne Docker
 

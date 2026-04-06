@@ -10,6 +10,10 @@ services:
       - "5416:5432"
     volumes:
       - stockly_postgres_data:/var/lib/postgresql/data
+    networks:
+      backend:
+        aliases:
+          - ${DATABASE_HOST:-stockly-db}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-stockly}"]
       interval: 10s
@@ -25,7 +29,7 @@ services:
         BASE_PATH: ${BASE_PATH:-}
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-stockly}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@${DATABASE_HOST:-stockly-db}:5432/${POSTGRES_DB:-stockly}?schema=public
       APP_URL: ${APP_URL:-http://localhost:5600}
       BASE_PATH: ${BASE_PATH:-}
       SESSION_SECRET: ${SESSION_SECRET:-change-this-session-secret-in-portainer}
@@ -38,6 +42,9 @@ services:
         condition: service_healthy
     ports:
       - "5600:3000"
+    networks:
+      - backend
+      - proxy
     healthcheck:
       test: ["CMD", "node", "scripts/healthcheck.mjs"]
       interval: 20s
@@ -47,3 +54,9 @@ services:
 
 volumes:
   stockly_postgres_data:
+
+networks:
+  backend:
+  proxy:
+    name: ${REVERSE_PROXY_NETWORK:-stockly-proxy}
+    external: ${REVERSE_PROXY_NETWORK_EXTERNAL:-false}
